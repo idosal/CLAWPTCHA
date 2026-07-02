@@ -62,6 +62,13 @@ export class GitHubApi {
     if (!res.ok) throw new Error(`updateCheckRun ${res.status}: ${await res.text()}`);
   }
 
+  async getCheckRun(repo: string, checkRunId: number): Promise<{ status: string; conclusion: string | null }> {
+    const res = await this.req(`/repos/${repo}/check-runs/${checkRunId}`);
+    if (!res.ok) throw new Error(`getCheckRun ${res.status}`);
+    const data = (await res.json()) as { status: string; conclusion: string | null };
+    return { status: data.status, conclusion: data.conclusion };
+  }
+
   async getPrDiff(repo: string, prNumber: number): Promise<string> {
     const res = await this.req(`/repos/${repo}/pulls/${prNumber}`, {}, "application/vnd.github.diff");
     if (!res.ok) throw new Error(`getPrDiff ${res.status}`);

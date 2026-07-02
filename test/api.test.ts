@@ -62,6 +62,15 @@ describe("GitHubApi", () => {
     expect(JSON.parse(String(patchCall![1]!.body)).body).toContain("<!-- clawptcha -->");
   });
 
+  it("gets a check run's status and conclusion", async () => {
+    const f = mockFetch(200, { status: "completed", conclusion: "success", id: 55 });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    const result = await api.getCheckRun("o/r", 55);
+    expect(result).toEqual({ status: "completed", conclusion: "success" });
+    const [url] = f.mock.calls[0];
+    expect(String(url)).toBe("https://api.github.com/repos/o/r/check-runs/55");
+  });
+
   it("throws on 5xx", async () => {
     const f = mockFetch(500, { message: "boom" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);

@@ -125,10 +125,12 @@ export async function sweepStaleChallenges(env: Env, now: Date): Promise<void> {
   }
 
   // Reconcile terminal challenges whose GitHub callback may have failed after
-  // the DB commit (state is finalized before the check-run PATCH). Re-issuing
-  // the terminal updateCheckRun is idempotent on GitHub's side. The challenges
-  // table has no updated_at, so recent created_at is the practical proxy for
-  // "recently resolved" — challenges are short-lived by design.
+  // the DB commit (state is finalized before the check-run PATCH). This sweep
+  // repairs ONLY check runs left incomplete by a failed resolution callback —
+  // it must never touch a check run that already completed, or it will
+  // clobber the real risk report with this generic placeholder on every tick.
+  // The challenges table has no updated_at, so recent created_at is the
+  // practical proxy for "recently resolved" — challenges are short-lived by design.
   const recentCutoff = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
   const terminal = await env.DB.prepare(
     `SELECT * FROM challenges
@@ -140,11 +142,14 @@ export async function sweepStaleChallenges(env: Env, now: Date): Promise<void> {
     const conclusion = conclusionForStatus(ch.status);
     if (!conclusion) continue;
     try {
+      const api = await apiForInstallation(env, ch.installation_id);
+      const current = await api.getCheckRun(ch.repo_full_name, ch.check_run_id!);
+      if (current.status === "completed") continue; // callback succeeded; leave the real report intact
+
       const quiz = await env.DB.prepare(
         "SELECT score FROM quizzes WHERE challenge_id=? AND score IS NOT NULL ORDER BY attempt_number DESC LIMIT 1"
       ).bind(ch.id).first<{ score: number }>();
       const scoreLine = quiz ? ` Final score: ${quiz.score}/4.` : "";
-      const api = await apiForInstallation(env, ch.installation_id);
       await api.updateCheckRun(ch.repo_full_name, ch.check_run_id!, {
         status: "completed", conclusion,
         output: {
