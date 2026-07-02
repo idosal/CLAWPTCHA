@@ -47,3 +47,12 @@ export function parseConfig(yamlText: string | null): ClawptchaConfig {
   const parsed = configSchema.safeParse(raw);
   return parsed.success ? parsed.data : freshDefaults();
 }
+
+// Parse a stored config_json snapshot back into a validated config.
+export function resolveConfig(json: string): ClawptchaConfig {
+  try {
+    return configSchema.parse(JSON.parse(json));
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
