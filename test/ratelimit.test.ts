@@ -27,4 +27,19 @@ describe("checkAndRecordRate", () => {
     ).bind("user:bob").all<{ n: number }>();
     expect(results[0].n).toBe(RATE_LIMITS.user);
   });
+
+  it("ignores events older than the sliding window", async () => {
+    const scopes = { user: "user:carol", repo: "repo:o/r3", installation: "inst:3" };
+    const stale = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // 2h ago
+    const stmts = [];
+    for (let i = 0; i < RATE_LIMITS.user + 5; i++) {
+      stmts.push(
+        testEnv.DB.prepare("INSERT INTO rate_events (scope, created_at) VALUES (?, ?)")
+          .bind(scopes.user, stale)
+      );
+    }
+    await testEnv.DB.batch(stmts);
+    const r = await checkAndRecordRate(testEnv.DB, scopes, new Date());
+    expect(r.allowed).toBe(true);
+  });
 });

@@ -10,6 +10,11 @@ export interface RateScopes {
 
 export type RateResult = { allowed: true } | { allowed: false; scope: keyof typeof RATE_LIMITS };
 
+// NOTE: check-then-insert is not atomic (D1 has no cross-statement
+// read-modify-write transaction from a Worker). Two concurrent calls can both
+// pass the count check, so caps can overshoot by roughly the concurrency
+// level. Accepted: this is a cost-control limiter, not a security boundary,
+// and the overshoot is bounded and small.
 export async function checkAndRecordRate(
   db: D1Database,
   scopes: RateScopes,
