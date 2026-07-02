@@ -96,7 +96,8 @@ export class GitHubApi {
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`getFileContent ${res.status}`);
     const data = (await res.json()) as { content: string };
-    return atob(data.content.replace(/\n/g, ""));
+    const bytes = Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
   }
 
   // One managed comment per PR, identified by COMMENT_MARKER.

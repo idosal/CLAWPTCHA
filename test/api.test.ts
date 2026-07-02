@@ -67,4 +67,28 @@ describe("GitHubApi", () => {
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
     await expect(api.getPrDiff("o/r", 7)).rejects.toThrow(/500/);
   });
+
+  it("creates the clawptcha PR comment when none exists (POST branch)", async () => {
+    const f = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (!init?.method || init.method === "GET") {
+        return new Response(JSON.stringify([{ id: 1, body: "unrelated comment" }]), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: 10 }), { status: 201 });
+    });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    await api.upsertPrComment("o/r", 7, "hello");
+    const postCall = f.mock.calls.find(([, i]) => i?.method === "POST");
+    expect(postCall).toBeDefined();
+    expect(String(postCall![0])).toContain("/issues/7/comments");
+    expect(JSON.parse(String(postCall![1]!.body)).body).toContain("<!-- clawptcha -->");
+  });
+
+  it("decodes UTF-8 config content correctly", async () => {
+    const utf8 = new TextEncoder().encode("# maintained by café\npass_threshold: 4\n");
+    const b64 = btoa(String.fromCharCode(...utf8));
+    const f = mockFetch(200, { content: b64, encoding: "base64" });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    const content = await api.getFileContent("o/r", ".github/clawptcha.yml", "main");
+    expect(content).toContain("café");
+  });
 });
