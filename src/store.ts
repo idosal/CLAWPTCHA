@@ -24,7 +24,7 @@ export async function getLatestChallengeForPr(
 ): Promise<Challenge | null> {
   return db
     .prepare(
-      "SELECT * FROM challenges WHERE repo_full_name=? AND pr_number=? ORDER BY created_at DESC LIMIT 1"
+      "SELECT * FROM challenges WHERE repo_full_name=? AND pr_number=? ORDER BY created_at DESC, rowid DESC LIMIT 1"
     )
     .bind(repo, prNumber)
     .first<Challenge>();
@@ -55,6 +55,14 @@ export async function insertChallenge(db: D1Database, c: Omit<Challenge, "create
       c.check_run_id, c.status, c.approved_by, c.attempts_used, c.cooldown_until, c.config_json
     )
     .run();
+}
+
+export async function updateChallengeCheckRun(
+  db: D1Database, repo: string, prNumber: number, headSha: string, checkRunId: number
+): Promise<void> {
+  await db.prepare(
+    "UPDATE challenges SET check_run_id=? WHERE repo_full_name=? AND pr_number=? AND head_sha=?"
+  ).bind(checkRunId, repo, prNumber, headSha).run();
 }
 
 export async function setChallengeStatus(

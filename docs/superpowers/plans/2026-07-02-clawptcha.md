@@ -2067,6 +2067,14 @@ git add src/store.ts src/github/events.ts test/events.test.ts
 git commit -m "feat: webhook orchestration - checks, comments, approval gate, idempotency"
 ```
 
+**Post-review deltas (applied in code, authoritative over the blocks above):**
+- `supersedeOldChallenges` runs BEFORE the exempt and keep-pass early returns, so stale open challenges are always invalidated on a new SHA.
+- `insertChallenge` is wrapped in try/catch: on a UNIQUE-constraint race (concurrent duplicate delivery), the handler calls `updateChallengeCheckRun` (new store helper) to point the existing row at the newest check run, then returns without commenting.
+- Approve matching uses `/^\/clawptcha\s+approve\b/` instead of `startsWith`.
+- `getLatestChallengeForPr` orders by `created_at DESC, rowid DESC` (tie-break).
+- The queued check run's summary includes the challenge link (belt-and-braces if the PR comment fails).
+- Tests: the keep-pass test is renamed (it never exercised supersede); two added tests cover the supersede path and the `rechallenge_on_push: true` branch (10 tests total).
+
 ---
 
 ### Task 12: Anthropic quiz generation (lazy)

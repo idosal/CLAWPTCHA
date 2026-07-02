@@ -93,7 +93,7 @@ describe("handlePullRequestEvent", () => {
     expect(api.createCheckRun).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a pass on synchronize by default; supersedes old challenge on new sha", async () => {
+  it("keeps a pass on synchronize by default", async () => {
     const api = stubApi();
     const n = uniq + 5;
     await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
@@ -117,6 +117,42 @@ describe("handlePullRequestEvent", () => {
     const n = uniq + 8;
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
     expect(getFileContent).toHaveBeenCalledWith("o/r", ".github/clawptcha.yml", "base000");
+  });
+
+  it("supersedes an open challenge when a new sha arrives", async () => {
+    const api = stubApi();
+    const n = uniq + 9;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
+    const p2 = payloadFor(n, "sha2");
+    p2.action = "synchronize";
+    const api2 = stubApi({ getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })) });
+    await handlePullRequestEvent(testEnv, api2, p2);
+    const old = await getChallengeByPr(testEnv.DB, "o/r", n, "sha1");
+    expect(old?.status).toBe("superseded");
+    const fresh = await getChallengeByPr(testEnv.DB, "o/r", n, "sha2");
+    expect(fresh?.status).toBe("awaiting_approval");
+  });
+
+  it("re-challenges on push when rechallenge_on_push is true, despite a prior pass", async () => {
+    const yaml = "rechallenge_on_push: true\n";
+    const api = stubApi({ getFileContent: vi.fn(async () => yaml) });
+    const n = uniq + 10;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
+    await testEnv.DB.prepare(
+      "UPDATE challenges SET status='passed' WHERE repo_full_name='o/r' AND pr_number=? AND head_sha='sha1'"
+    ).bind(n).run();
+    const p2 = payloadFor(n, "sha2");
+    p2.action = "synchronize";
+    const api2 = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })),
+    });
+    await handlePullRequestEvent(testEnv, api2, p2);
+    const fresh = await getChallengeByPr(testEnv.DB, "o/r", n, "sha2");
+    expect(fresh).not.toBeNull(); // new challenge created despite prior pass
+    // prior passed row is untouched by supersede
+    const old = await getChallengeByPr(testEnv.DB, "o/r", n, "sha1");
+    expect(old?.status).toBe("passed");
   });
 });
 

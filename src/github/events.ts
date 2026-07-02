@@ -4,7 +4,8 @@ import { parseConfig, resolveConfig, type ClawptchaConfig } from "../config";
 import { evaluateExemption } from "../policy/exemptions";
 import {
   getChallengeByPr, getLatestChallengeForPr, hasPassedChallenge,
-  insertChallenge, setChallengeStatus, supersedeOldChallenges, randomToken,
+  insertChallenge, setChallengeStatus, supersedeOldChallenges,
+  updateChallengeCheckRun, randomToken,
 } from "../store";
 
 export const CHECK_NAME = "clawptcha";
@@ -59,6 +60,10 @@ export async function handlePullRequestEvent(
   const configYaml = await api.getFileContent(repo, ".github/clawptcha.yml", baseSha);
   const cfg = parseConfig(configYaml);
 
+  // A new head SHA obsoletes any open challenge for this PR, regardless of
+  // which branch below handles it — stale challenges must never stay takeable.
+  await supersedeOldChallenges(env.DB, repo, prNumber, headSha);
+
   const changedFiles = await api.listPrFiles(repo, prNumber);
   const exemption = evaluateExemption(
     {
@@ -90,8 +95,6 @@ export async function handlePullRequestEvent(
     }
   }
 
-  await supersedeOldChallenges(env.DB, repo, prNumber, headSha);
-
   const needsApproval =
     cfg.require_approval === "always" ||
     (cfg.require_approval === "first_time" &&
@@ -103,26 +106,39 @@ export async function handlePullRequestEvent(
     name: CHECK_NAME, head_sha: headSha, status: "queued",
     output: {
       title: needsApproval ? "Awaiting maintainer approval" : "Awaiting challenge",
-      summary: needsApproval
-        ? "A maintainer must approve the challenge (`/clawptcha approve`) before the author can take it."
-        : "The PR author must pass a comprehension quiz. Link in the PR comment.",
+      summary:
+        (needsApproval
+          ? "A maintainer must approve the challenge (`/clawptcha approve`) before the author can take it."
+          : "The PR author must pass a comprehension quiz. Link in the PR comment.") +
+        `\n\nChallenge link: ${challengeUrl(env, challengeId)}`,
     },
   });
 
-  await insertChallenge(env.DB, {
-    id: challengeId,
-    installation_id: installationId,
-    repo_full_name: repo,
-    pr_number: prNumber,
-    head_sha: headSha,
-    author_login: pr.author_login,
-    check_run_id: checkRunId,
-    status,
-    approved_by: null,
-    attempts_used: 0,
-    cooldown_until: null,
-    config_json: JSON.stringify(cfg),
-  });
+  try {
+    await insertChallenge(env.DB, {
+      id: challengeId,
+      installation_id: installationId,
+      repo_full_name: repo,
+      pr_number: prNumber,
+      head_sha: headSha,
+      author_login: pr.author_login,
+      check_run_id: checkRunId,
+      status,
+      approved_by: null,
+      attempts_used: 0,
+      cooldown_until: null,
+      config_json: JSON.stringify(cfg),
+    });
+  } catch (e) {
+    // Concurrent duplicate delivery: the other handler won the UNIQUE race.
+    // Point the stored challenge at the newest check run (GitHub evaluates the
+    // latest run per name+SHA) and stop — the winner posts the comment.
+    if (String(e).includes("UNIQUE")) {
+      await updateChallengeCheckRun(env.DB, repo, prNumber, headSha, checkRunId);
+      return;
+    }
+    throw e;
+  }
 
   await api.upsertPrComment(repo, prNumber, commentBody(env, challengeId, status, cfg, pr.author_login));
 }
@@ -133,7 +149,7 @@ export async function handleIssueCommentEvent(
   if (payload.action !== "created") return;
   if (!payload.issue?.pull_request) return; // not a PR comment
   const body = (payload.comment.body as string).trim();
-  if (!body.startsWith("/clawptcha approve")) return;
+  if (!/^\/clawptcha\s+approve\b/.test(body)) return;
 
   const repo = payload.repository.full_name as string;
   const prNumber = payload.issue.number as number;
