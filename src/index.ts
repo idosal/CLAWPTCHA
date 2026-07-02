@@ -10,11 +10,19 @@ import { signSessionCookie, verifySessionCookie } from "./ui/session";
 import { authorizeUrl, exchangeCodeForLogin } from "./github/oauth";
 import { startPage, questionPage, resultPage, errorPage } from "./ui/pages";
 import { startQuizAttempt, submitAnswer, type ChallengeDeps } from "./challenge";
-import { generateQuiz } from "./quiz/generate";
+import { generateQuiz, type LlmClient } from "./quiz/generate";
 import { redactForClient, type Quiz } from "./quiz/schema";
 import { QUESTION_TIME_LIMIT_MS } from "./quiz/grade";
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.onError((err, c) => {
+  console.error("unhandled route error", c.req.path, err);
+  return c.html(
+    errorPage("Something went wrong", "Temporary problem on our side — please try again in a minute. Your PR is not blocked by this error."),
+    500
+  );
+});
 
 // ---------- webhooks ----------
 app.post("/webhook", async (c) => {
@@ -80,19 +88,26 @@ function challengeDeps(env: Env): ChallengeDeps {
     },
     async generateQuiz(ctx, cfg) {
       return generateQuiz(
-        anthropic as any, env.CLAUDE_MODEL,
+        anthropic as unknown as LlmClient, env.CLAUDE_MODEL,
         ctx.diff, ctx.title, ctx.body, ctx.files, cfg.max_context_tokens
       );
     },
     async verifyTurnstile(token: string) {
-      if (!token) return false;
-      const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: token }),
-      });
-      if (!res.ok) return false;
-      return ((await res.json()) as { success: boolean }).success;
+      // Turnstile informs risk scoring but never blocks: any failure (network,
+      // parse, service outage) degrades to `false`, which callers treat as a
+      // signal — not a gate. A siteverify outage must not lock authors out.
+      try {
+        if (!token) return false;
+        const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: token }),
+        });
+        if (!res.ok) return false;
+        return ((await res.json()) as { success: boolean }).success;
+      } catch {
+        return false;
+      }
     },
     async onChallengeResolved(r) {
       await onChallengeResolved(env, r);
@@ -102,6 +117,10 @@ function challengeDeps(env: Env): ChallengeDeps {
 
 // ---------- OAuth ----------
 app.get("/oauth/callback", async (c) => {
+  if (c.req.query("error")) {
+    return c.html(errorPage("Sign-in canceled",
+      "You canceled GitHub sign-in — reopen the challenge link from the PR to try again."), 400);
+  }
   const code = c.req.query("code");
   const state = c.req.query("state");
   if (!code || !state) return c.html(errorPage("OAuth error", "Missing code or state."), 400);
@@ -142,7 +161,7 @@ app.get("/challenge/:id", async (c) => {
       "A maintainer must approve this challenge first (`/clawptcha approve` on the PR)."));
   }
   if (challenge.status === "passed") {
-    return c.html(resultPage(true, 0, 0, "You already passed this challenge. The check is green."));
+    return c.html(errorPage("✅ Already passed", "You already passed this challenge. The check is green."));
   }
   return c.html(startPage(
     `${challenge.repo_full_name}#${challenge.pr_number}`, c.env.TURNSTILE_SITE_KEY, challenge.id
@@ -167,7 +186,8 @@ app.post("/challenge/:id/start", async (c) => {
       not_author: "Only the PR author can take this challenge.",
       not_found: "Challenge not found.",
     };
-    return c.html(errorPage("Cannot start", messages[result.error] ?? result.error), 409);
+    return c.html(errorPage("Cannot start", messages[result.error] ?? result.error),
+      result.error === "not_found" ? 404 : 409);
   }
   // Store active quiz id on the session row to route question/answer requests.
   await c.env.DB.prepare("UPDATE sessions SET challenge_id=? WHERE id=?")

@@ -88,31 +88,38 @@ function conclusionForStatus(status: Challenge["status"]): "success" | "failure"
   }
 }
 
-// Cron: any check left pending >30 min gets neutralized so we never block on our own outage.
-export async function sweepStaleChallenges(env: Env, now: Date): Promise<void> {
+// Cron: any check left dangling gets neutralized so we never block on our own outage.
+export async function sweepStaleChallenges(
+  env: Env, now: Date,
+  apiFactory: (env: Env, installationId: number) => Promise<GitHubApi> = apiForInstallation
+): Promise<void> {
   // Rate-limit events older than the sliding window are dead weight — purge them
   // (2h cutoff = WINDOW_MS + margin) so the table doesn't grow unboundedly.
   await env.DB.prepare("DELETE FROM rate_events WHERE created_at < ?")
     .bind(new Date(now.getTime() - 2 * 60 * 60_000).toISOString())
     .run();
 
-  const cutoff = new Date(now.getTime() - 30 * 60_000).toISOString();
+  // Expired sessions (1h TTL) are dead rows — and anonymous visits create them.
+  await env.DB.prepare("DELETE FROM sessions WHERE created_at < ?")
+    .bind(new Date(now.getTime() - 2 * 60 * 60_000).toISOString())
+    .run();
+
+  // Neutralize dangling challenges: awaiting/ready with no quiz attempt after
+  // 24h means the service failed mid-setup or the author never showed — mark
+  // neutral so the check doesn't dangle forever. LIMIT caps per-tick GitHub
+  // calls; stragglers get picked up next cron tick.
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
   const { results } = await env.DB.prepare(
     `SELECT * FROM challenges
      WHERE status IN ('awaiting_approval','ready') AND created_at < ?
        AND check_run_id IS NOT NULL
-       AND id NOT IN (SELECT challenge_id FROM quizzes)`
+       AND id NOT IN (SELECT challenge_id FROM quizzes)
+     LIMIT 100`
   ).bind(cutoff).all<Challenge>();
 
   for (const ch of results) {
-    // Stale but structurally fine challenges stay open — only neutralize ones
-    // whose check was never moved past 'queued' AND that predate the cutoff by
-    // a lot (service failed mid-setup). Heuristic: awaiting/ready with no quiz
-    // after 24h → mark neutral so the check doesn't dangle forever.
-    const dayCutoff = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
-    if (ch.created_at >= dayCutoff) continue;
     try {
-      const api = await apiForInstallation(env, ch.installation_id);
+      const api = await apiFactory(env, ch.installation_id);
       await api.updateCheckRun(ch.repo_full_name, ch.check_run_id!, {
         status: "completed", conclusion: "neutral",
         output: {
@@ -135,14 +142,15 @@ export async function sweepStaleChallenges(env: Env, now: Date): Promise<void> {
   const terminal = await env.DB.prepare(
     `SELECT * FROM challenges
      WHERE status IN ('passed','failed_final','neutral')
-       AND check_run_id IS NOT NULL AND created_at >= ?`
+       AND check_run_id IS NOT NULL AND created_at >= ?
+     LIMIT 100`
   ).bind(recentCutoff).all<Challenge>();
 
   for (const ch of terminal.results) {
     const conclusion = conclusionForStatus(ch.status);
     if (!conclusion) continue;
     try {
-      const api = await apiForInstallation(env, ch.installation_id);
+      const api = await apiFactory(env, ch.installation_id);
       const current = await api.getCheckRun(ch.repo_full_name, ch.check_run_id!);
       if (current.status === "completed") continue; // callback succeeded; leave the real report intact
 
