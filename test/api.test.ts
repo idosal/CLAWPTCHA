@@ -12,6 +12,17 @@ function mockFetch(status: number, body: unknown) {
 }
 
 describe("GitHubApi", () => {
+  it("invokes fetch unbound (Workers rejects the global fetch called as a method)", async () => {
+    // A `this`-sensitive fetch, like the real Workers global: throws if called
+    // as `this.fetchFn(...)`. Reproduces the "Illegal invocation" runtime bug.
+    const strictFetch = function (this: unknown) {
+      if (this !== undefined) throw new TypeError("Illegal invocation");
+      return Promise.resolve(new Response("diff --git a/x b/x", { status: 200 }));
+    };
+    const api = new GitHubApi("tok", strictFetch as unknown as typeof fetch);
+    await expect(api.getPrDiff("o/r", 1)).resolves.toContain("diff --git");
+  });
+
   it("creates a check run with auth headers", async () => {
     const f = mockFetch(201, { id: 42 });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);

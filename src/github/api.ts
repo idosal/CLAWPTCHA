@@ -37,7 +37,12 @@ export class GitHubApi {
   }
 
   private async req(path: string, init: RequestInit = {}, accept?: string): Promise<Response> {
-    const res = await this.fetchFn(`${API}${path}`, {
+    // Detach fetchFn from `this` before calling. The Workers runtime rejects the
+    // global `fetch` invoked as a method (`this.fetchFn(...)`) with "Illegal
+    // invocation"; a local binding calls it unbound. (Injected mocks don't care,
+    // which is why unit tests didn't surface this — only the real runtime does.)
+    const doFetch = this.fetchFn;
+    const res = await doFetch(`${API}${path}`, {
       ...init,
       headers: { ...this.headers(accept), ...(init.body ? { "content-type": "application/json" } : {}) },
     });
