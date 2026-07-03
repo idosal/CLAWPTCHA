@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { generateQuiz, buildGenerationPrompt, capContext } from "../src/quiz/generate";
+import type { QuizProvider, CompletionParams, CompletionResult } from "../src/quiz/providers";
 
 const goodQuizJson = JSON.stringify({
   questions: [
@@ -10,16 +11,12 @@ const goodQuizJson = JSON.stringify({
   ],
 });
 
-function stubClient(responses: string[]) {
+function stubProvider(responses: Array<{ ok: true; text: string } | { ok: false; error: string }>) {
   let i = 0;
-  return {
-    messages: {
-      create: vi.fn(async () => ({
-        content: [{ type: "text", text: responses[Math.min(i++, responses.length - 1)] }],
-        stop_reason: "end_turn",
-      })),
-    },
-  };
+  const complete = vi.fn(
+    async (_params: CompletionParams): Promise<CompletionResult> => responses[Math.min(i++, responses.length - 1)]
+  );
+  return { provider: { complete } as QuizProvider, complete };
 }
 
 describe("capContext", () => {
@@ -36,31 +33,57 @@ describe("capContext", () => {
 });
 
 describe("generateQuiz", () => {
-  it("returns a validated quiz from the model", async () => {
-    const client = stubClient([goodQuizJson]);
-    const r = await generateQuiz(client as any, "claude-sonnet-5", "diff", "title", "body", ["a.ts"], null);
+  it("returns a validated quiz from the provider", async () => {
+    const { provider } = stubProvider([{ ok: true, text: goodQuizJson }]);
+    const r = await generateQuiz(provider, "diff", "title", "body", ["a.ts"], null);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.quiz.questions).toHaveLength(4);
   });
 
+  it("passes system prompt, user prompt, schema, and maxTokens to the provider", async () => {
+    const { provider, complete } = stubProvider([{ ok: true, text: goodQuizJson }]);
+    await generateQuiz(provider, "THE_DIFF", "title", null, ["a.ts"], null);
+    const params = complete.mock.calls[0][0];
+    expect(params.system).toContain("SHORT questions");
+    expect(params.prompt).toContain("THE_DIFF");
+    expect(params.schema).toBeDefined();
+    expect(params.maxTokens).toBe(16000);
+  });
+
   it("retries once on invalid output, then succeeds", async () => {
-    const client = stubClient(["not json at all", goodQuizJson]);
-    const r = await generateQuiz(client as any, "claude-sonnet-5", "diff", "t", null, [], null);
+    const { provider, complete } = stubProvider([
+      { ok: true, text: "not json at all" },
+      { ok: true, text: goodQuizJson },
+    ]);
+    const r = await generateQuiz(provider, "diff", "t", null, [], null);
     expect(r.ok).toBe(true);
-    expect(client.messages.create).toHaveBeenCalledTimes(2);
+    expect(complete).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries once on a provider error, then succeeds", async () => {
+    const { provider, complete } = stubProvider([
+      { ok: false, error: "anthropic: HTTP 529" },
+      { ok: true, text: goodQuizJson },
+    ]);
+    const r = await generateQuiz(provider, "diff", "t", null, [], null);
+    expect(r.ok).toBe(true);
+    expect(complete).toHaveBeenCalledTimes(2);
   });
 
   it("fails after two invalid outputs", async () => {
-    const client = stubClient(['{"questions": []}']);
-    const r = await generateQuiz(client as any, "claude-sonnet-5", "diff", "t", null, [], null);
+    const { provider, complete } = stubProvider([{ ok: true, text: '{"questions": []}' }]);
+    const r = await generateQuiz(provider, "diff", "t", null, [], null);
     expect(r.ok).toBe(false);
-    expect(client.messages.create).toHaveBeenCalledTimes(2);
+    expect(complete).toHaveBeenCalledTimes(2);
   });
 
-  it("fails gracefully when the API throws", async () => {
-    const client = { messages: { create: vi.fn(async () => { throw new Error("529"); }) } };
-    const r = await generateQuiz(client as any, "claude-sonnet-5", "diff", "t", null, [], null);
-    expect(r.ok).toBe(false);
+  it("passes configured question count to validation", async () => {
+    const twoQuestionQuiz = JSON.stringify({
+      questions: JSON.parse(goodQuizJson).questions.slice(0, 2),
+    });
+    const { provider } = stubProvider([{ ok: true, text: twoQuestionQuiz }]);
+    const r = await generateQuiz(provider, "diff", "title", "body", ["a.ts"], null, 2);
+    expect(r.ok).toBe(true);
   });
 });
 
@@ -70,5 +93,10 @@ describe("buildGenerationPrompt", () => {
     expect(p).toContain("THE_DIFF");
     expect(p).toContain("My title");
     expect(p).toContain("blast_radius_multi");
+  });
+
+  it("includes the configured question count", () => {
+    const p = buildGenerationPrompt("diff", "title", null, ["a.ts"], null, 6);
+    expect(p).toContain("Question count: 6");
   });
 });

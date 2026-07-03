@@ -1,14 +1,5 @@
 import { validateQuiz, QUIZ_JSON_SCHEMA, type Quiz } from "./schema";
-
-// Minimal client interface — satisfied by @anthropic-ai/sdk's Anthropic instance.
-export interface LlmClient {
-  messages: {
-    create(params: Record<string, unknown>): Promise<{
-      content: Array<{ type: string; text?: string }>;
-      stop_reason: string | null;
-    }>;
-  };
-}
+import type { QuizProvider } from "./providers";
 
 const SYSTEM_PROMPT = `You generate SHORT questions that check whether the PR author understands
 WHAT their change accomplishes — its purpose and its effect — NOT how the code works.
@@ -33,12 +24,12 @@ For a change that rejects expired auth tokens:
 - BAD: anything naming a function, a status code, a return value, an operator, or a file.
 
 Rules:
-- Exactly 4 questions, each with exactly 4 short options.
+- Generate the requested number of questions, each with exactly 4 short options.
 - Types: "consequence_mcq" (one plain consequence for a user or the system; exactly 1 correct),
   "blast_radius_multi" ("which of these does this change affect?" in plain user/behavior terms; 2-3 correct),
   "false_claim" (four short statements about the change's purpose/effect, exactly one subtly FALSE;
   the correct answer is the false statement's index).
-- Include at least one of each type.
+- If generating 3 or more questions, include at least one of each type.
 - Distractors must be plausible to someone who has NOT grasped the change's purpose.`;
 
 // crude token estimate: ~4 chars/token
@@ -53,7 +44,8 @@ export function capContext(diff: string, files: string[], maxContextTokens: numb
 }
 
 export function buildGenerationPrompt(
-  diff: string, title: string, body: string | null, files: string[], maxContextTokens: number | null
+  diff: string, title: string, body: string | null, files: string[],
+  maxContextTokens: number | null, questionCount = 4
 ): string {
   return [
     `PR title: ${title}`,
@@ -65,6 +57,7 @@ export function buildGenerationPrompt(
     capContext(diff, files, maxContextTokens),
     "```",
     "",
+    `Question count: ${questionCount}`,
     "Question types: consequence_mcq, blast_radius_multi, false_claim.",
     "Generate the quiz now.",
   ].join("\n");
@@ -73,35 +66,29 @@ export function buildGenerationPrompt(
 export type GenerateResult = { ok: true; quiz: Quiz } | { ok: false; error: string };
 
 export async function generateQuiz(
-  client: LlmClient,
-  model: string,
+  provider: QuizProvider,
   diff: string,
   title: string,
   body: string | null,
   files: string[],
-  maxContextTokens: number | null
+  maxContextTokens: number | null,
+  questionCount = 4
 ): Promise<GenerateResult> {
-  const prompt = buildGenerationPrompt(diff, title, body, files, maxContextTokens);
+  const prompt = buildGenerationPrompt(diff, title, body, files, maxContextTokens, questionCount);
   let lastError = "unknown";
   for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await client.messages.create({
-        model,
-        max_tokens: 16000,
-        system: SYSTEM_PROMPT,
-        output_config: { format: { type: "json_schema", schema: QUIZ_JSON_SCHEMA } },
-        messages: [{ role: "user", content: prompt }],
-      });
-      const text = response.content.find((b) => b.type === "text")?.text;
-      if (!text) { lastError = "no text block in response"; continue; }
-      let raw: unknown;
-      try { raw = JSON.parse(text); } catch { lastError = "invalid JSON"; continue; }
-      const validated = validateQuiz(raw);
-      if (validated.ok) return { ok: true, quiz: validated.quiz };
-      lastError = validated.error;
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e);
-    }
+    const result = await provider.complete({
+      system: SYSTEM_PROMPT,
+      prompt,
+      schema: QUIZ_JSON_SCHEMA,
+      maxTokens: 16000,
+    });
+    if (!result.ok) { lastError = result.error; continue; }
+    let raw: unknown;
+    try { raw = JSON.parse(result.text); } catch { lastError = "invalid JSON"; continue; }
+    const validated = validateQuiz(raw, questionCount);
+    if (validated.ok) return { ok: true, quiz: validated.quiz };
+    lastError = validated.error;
   }
   return { ok: false, error: lastError };
 }
