@@ -27,7 +27,17 @@ The config is always read from the PR's **merge target** (base branch), never
 the PR branch itself, so a PR cannot weaken its own gate.
 
 ```yaml
-pass_threshold: 3        # of 4 questions
+gates:
+  - type: multiple_choice
+    questions: 4
+    pass_threshold: 3
+
+exemptions:
+  # Optional. Reuses ordinary GitHub issue workflow; no Clawptcha-specific
+  # label is required when the linked issue already has a trusted signal.
+  - type: linked_issue_match
+    min_match_score: 0.7
+
 max_attempts: 3
 cooldown_minutes: 15
 require_approval: first_time  # first_time | always | never
@@ -41,20 +51,37 @@ max_context_tokens: null
 
 | Field | Default | Behavior |
 |---|---|---|
-| `pass_threshold` | `3` | Integer, 1–4. Minimum correct answers (out of 4) to pass a quiz attempt. |
+| `gates` | `[{ type: "multiple_choice", questions: 4, pass_threshold: 3 }]` | Author-facing challenge stages. Today Clawptcha supports `multiple_choice`, with `questions` as an integer 1–10 and `pass_threshold` capped at the question count. |
+| `exemptions` | `[]` | Structured reasons no challenge is required. Today Clawptcha supports `linked_issue_match`, which can exempt a PR when it closes a trusted issue and the issue intent matches the PR. |
+| `pass_threshold` | `3` | Legacy shortcut for the default multiple-choice gate's threshold when `gates` is omitted. New configs should prefer `gates[0].pass_threshold`. |
 | `max_attempts` | `3` | Integer, 1–10. Total quiz attempts allowed per challenge before the check becomes `failed_final` and stays failed for maintainers to review manually. |
 | `cooldown_minutes` | `15` | Integer, ≥ 0. Minutes an author must wait after a failed (non-final) attempt before starting a retry. |
 | `require_approval` | `"first_time"` | Enum: `first_time` \| `always` \| `never`. `first_time` requires maintainer approval (`/clawptcha approve` PR comment) only when the author's GitHub `author_association` is `FIRST_TIME_CONTRIBUTOR`, `FIRST_TIMER`, or `NONE`; `always` requires approval for every PR; `never` skips the approval gate entirely. An invalid value falls back to `first_time`. |
 | `rechallenge_on_push` | `false` | If `false`, a `synchronize` event (new commits) on a PR that already passed keeps the pass (auto green check). If `true`, any new head SHA invalidates the prior pass and issues a brand-new challenge. |
 | `skip_authors` | `[]` | List of GitHub logins always exempt from the quiz (case-insensitive match). |
 | `skip_bots` | `true` | If `true`, PR authors whose GitHub account type is `Bot` (e.g. dependabot, renovate) are auto-exempt. |
-| `min_changed_lines` | `10` | Diffs with fewer than this many changed lines (additions + deletions) auto-pass ("diff below min_changed_lines"). |
-| `skip_paths` | `["docs/**", "*.md"]` | Glob list. If **every** changed file in the PR matches at least one pattern, the PR auto-passes as exempt. PRs with zero reported changed files are never auto-exempted this way. |
+| `min_changed_lines` | `10` | Diffs with fewer than this many changed lines (additions + deletions) are exempt ("diff below min_changed_lines"). |
+| `skip_paths` | `["docs/**", "*.md"]` | Glob list. If **every** changed file in the PR matches at least one pattern, the PR is exempt. PRs with zero reported changed files are never exempted this way. |
 | `max_context_tokens` | `null` | `null` = uncapped: the full diff is sent to the LLM (bounded only by the model's context window). If set to a positive integer, the diff sent to the LLM is truncated to roughly that many tokens (~4 chars/token estimate) and replaced past that point with a full list of changed filenames. Invalid values (including `0` or negative numbers) fall back to `null`, not to some non-null default — `null` is the documented, deliberately fail-open default for this field. |
 
 Maintainers, repo admins, and users with `OWNER`/`MEMBER`/`COLLABORATOR`
 `author_association` are exempt by default regardless of config (checked
 before `skip_authors`/size/path rules, per `src/policy/exemptions.ts`).
+
+### Linked issue exemptions
+
+`linked_issue_match` looks for normal GitHub closing references in the PR body
+(`Fixes #123`, `Closes owner/repo#123`, or a GitHub issue URL), fetches the
+issue, and exempts the PR only when:
+
+- the issue has a trusted signal: maintainer/collaborator author, assigned
+  maintainer/collaborator, or one of the optional `trusted_labels`;
+- the PR title/body/files match the issue's requested outcome at or above
+  `min_match_score`;
+- the issue is in the same repo, unless `require_same_repo: false` is set.
+
+If the issue is missing, untrusted, or only weakly related, Clawptcha falls back
+to the configured `gates`; it does not fail the PR for an uncertain exemption.
 
 ### Glob semantics (`skip_paths`)
 
@@ -102,20 +129,32 @@ segment (split on `/`) — no regex, so it can't backtrack pathologically:
    for the domain the Worker will be served from. Note the site key and
    secret key.
 
-4. **Set all 9 secrets** (`wrangler secret put <NAME>`), matching `Env` in
-   `src/types.ts` exactly:
+4. **Configure the LLM provider** (`vars` in `wrangler.jsonc`) and **set the
+   secrets** (`wrangler secret put <NAME>`), matching `Env` in `src/types.ts`:
+
+   Providers (`LLM_PROVIDER`):
+   - `workers-ai` (default) — runs on your Cloudflare account's Workers AI.
+     No LLM secret needed. `LLM_MODEL` defaults to Kimi K2.7 Code
+     (`@cf/moonshotai/kimi-k2.7-code`). Optionally set `AI_GATEWAY_ID` to an
+     AI Gateway for spend caps and analytics.
+   - `anthropic` — direct Anthropic API. Set `LLM_MODEL` (e.g.
+     `claude-sonnet-5`) and secret `LLM_API_KEY`.
+   - `openai-compat` — any `/chat/completions` endpoint (OpenAI, Groq, local
+     vLLM). Set `LLM_BASE_URL` (e.g. `https://api.openai.com/v1`),
+     `LLM_MODEL`, and secret `LLM_API_KEY` if the endpoint needs one.
+
+   Secrets (8, or 9 with `LLM_API_KEY`):
    - `GITHUB_APP_ID`
    - `GITHUB_PRIVATE_KEY` (PKCS#8 PEM from step 2)
    - `GITHUB_WEBHOOK_SECRET`
    - `GITHUB_OAUTH_CLIENT_ID`
    - `GITHUB_OAUTH_CLIENT_SECRET`
-   - `ANTHROPIC_API_KEY`
    - `TURNSTILE_SITE_KEY`
    - `TURNSTILE_SECRET_KEY`
    - `SESSION_SIGNING_KEY` (random 32+ bytes, hex — signs the session cookie)
+   - `LLM_API_KEY` (only for `anthropic` / keyed `openai-compat`)
 
-   Also confirm the non-secret `vars` in `wrangler.jsonc` (`APP_BASE_URL`,
-   `CLAUDE_MODEL`) match your deployed Worker's URL and desired model.
+   Also confirm `APP_BASE_URL` in `wrangler.jsonc` matches your Worker's URL.
 
 5. **Deploy.**
    ```bash
@@ -193,8 +232,9 @@ cannot run in CI. Walk each scenario and record the outcome:
       the check run details.
 - [ ] Push a new commit → the new head SHA keeps the existing pass (default
       `rechallenge_on_push: false`).
-- [ ] Open a docs-only PR → auto-passes with an "Exempt" check summary.
+- [ ] Open a docs-only PR → gets a success check with an "Exempt" summary.
 - [ ] Fail a quiz deliberately → red check, cooldown message shown; retrying
       after the cooldown gets a freshly generated quiz.
-- [ ] Temporarily set an invalid `ANTHROPIC_API_KEY` and start a quiz →
-      check goes `neutral`, merge is not blocked.
+- [ ] Temporarily break the LLM config (e.g. set `LLM_MODEL` to a nonexistent
+      model, or an invalid `LLM_API_KEY`) and start a quiz → check goes
+      `neutral`, merge is not blocked.

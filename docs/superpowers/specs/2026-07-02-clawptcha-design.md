@@ -72,7 +72,7 @@ Contributor ──challenge link──▶ Quiz web UI (served by same Worker)
   questions + correct answers server-side only), `attempts` (per contributor,
   score, timestamps, cooldown state).
 - **LLM** — Anthropic API, `claude-sonnet-5`, structured output (JSON schema)
-  for quiz generation.
+  for quiz generation. (superseded by the 2026-07-03 provider spec)
 
 ## Flow
 
@@ -148,7 +148,11 @@ Generation requirements:
 
 ```yaml
 # all fields optional; defaults shown
-pass_threshold: 3        # of 4 questions
+gates:
+  - type: multiple_choice
+    questions: 4
+    pass_threshold: 3
+exemptions: []           # e.g. linked_issue_match for trusted matching issues
 max_attempts: 3
 cooldown_minutes: 15
 require_approval: first_time  # first_time | always | never — maintainer must
@@ -156,8 +160,8 @@ require_approval: first_time  # first_time | always | never — maintainer must
 rechallenge_on_push: false
 skip_authors: []         # usernames always exempt
 skip_bots: true          # dependabot, renovate, etc.
-min_changed_lines: 10    # smaller diffs auto-pass
-skip_paths: ["docs/**", "*.md"]  # diffs touching only these auto-pass
+min_changed_lines: 10    # smaller diffs are exempt
+skip_paths: ["docs/**", "*.md"]  # diffs touching only these are exempt
 max_context_tokens: null # off by default; set to cap diff+context sent to the LLM
 ```
 
@@ -174,7 +178,7 @@ Clawptcha must never block merges because of its own problems:
   terminal challenge whose check-run update failed after the DB was already
   finalized is re-issued idempotently (the sweep only touches check runs that
   never completed, so it never clobbers a real risk report).
-- Docs-only / tiny diffs auto-pass per config defaults.
+- Docs-only / tiny diffs are exempt per config defaults.
 
 ## Cost control
 
@@ -251,7 +255,7 @@ diff-derived question text is emptied (retention rule).
 ## Milestones
 
 1. **Core service:** GitHub App plumbing — webhooks, check runs, PR comment,
-   config loading, exemptions, approval gate. Check auto-passes everything
+   config loading, exemptions, approval gate. Check succeeds without a quiz
    (no quiz yet).
 2. **Quiz engine:** lazy LLM generation with schema validation, D1 storage,
    grading, attempt/cooldown state machine, rate limits.
