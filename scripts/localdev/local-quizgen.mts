@@ -7,7 +7,11 @@
 //                          (bindings don't exist in Node); needs CF_ACCOUNT_ID + CF_API_TOKEN.
 // Usage:
 //   node scripts/localdev/local-quizgen.mts <diff-file> <meta.json> [raw-out] \
-//     [--provider claude-cli|anthropic|openai-compat|workers-ai] [--model <id>]
+//     [--provider claude-cli|anthropic|openai-compat|workers-ai] [--model <id>] \
+//     [--context <tokens>]
+// [raw-out] applies to the claude-cli provider only.
+// --context caps the diff context in tokens; omit for uncapped (the default,
+// matching production's default max_context_tokens: null).
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -22,8 +26,13 @@ const { values: flags, positionals } = parseArgs({
   options: {
     provider: { type: "string", default: "claude-cli" },
     model: { type: "string", default: "claude-sonnet-5" },
+    context: { type: "string" },
   },
 });
+const maxContextTokens = flags.context ? Number(flags.context) : null;
+if (maxContextTokens !== null && (!Number.isInteger(maxContextTokens) || maxContextTokens <= 0)) {
+  throw new Error("--context must be a positive integer (tokens)");
+}
 const [diffPath, metaPath, rawOut] = positionals;
 const diff = readFileSync(diffPath, "utf8");
 const meta = JSON.parse(readFileSync(metaPath, "utf8"));
@@ -74,7 +83,7 @@ function pickProvider(): QuizProvider {
 
 const result = await generateQuiz(
   pickProvider(), diff, meta.title ?? "Local test PR", meta.body ?? null,
-  ["(files from diff)"], 1500
+  ["(files from diff)"], maxContextTokens
 );
 
 if (!result.ok) {
