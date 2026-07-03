@@ -132,6 +132,10 @@ segment (split on `/`) — no regex, so it can't backtrack pathologically:
 4. **Configure the LLM provider** (`vars` in `wrangler.jsonc`) and **set the
    secrets** (`wrangler secret put <NAME>`), matching `Env` in `src/types.ts`:
 
+   Most self-hosters should keep the default `workers-ai` — it needs no
+   external API key and bills to your Cloudflare account. Choose `anthropic`
+   or `openai-compat` only if you want a specific model or provider.
+
    Providers (`LLM_PROVIDER`):
    - `workers-ai` (default) — runs on your Cloudflare account's Workers AI.
      No LLM secret needed. `LLM_MODEL` defaults to Kimi K2.7 Code

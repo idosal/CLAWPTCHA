@@ -72,7 +72,8 @@ Contributor ──challenge link──▶ Quiz web UI (served by same Worker)
   questions + correct answers server-side only), `attempts` (per contributor,
   score, timestamps, cooldown state).
 - **LLM** — Anthropic API, `claude-sonnet-5`, structured output (JSON schema)
-  for quiz generation. (superseded by the 2026-07-03 provider spec)
+  for quiz generation. (superseded by
+  `docs/superpowers/specs/2026-07-03-llm-provider-and-hosted-deployment-design.md`)
 
 ## Flow
 
