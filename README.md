@@ -106,7 +106,8 @@ Two easy paths — both end with the same wizard:
 - **Deploy button (no local tooling to start):** click the button — Cloudflare
   forks the repo and provisions the Worker, D1 database, and Workers AI
   binding. Then clone **your fork** and run the wizard for the GitHub-side
-  setup:
+  setup (its deploy step re-runs harmlessly against the already-provisioned
+  resources):
   ```bash
   npx wrangler login && npm run setup
   ```
@@ -120,7 +121,11 @@ Two easy paths — both end with the same wizard:
   the key is converted to PKCS#8 for you), sets up Turnstile (automatic if
   `CLOUDFLARE_API_TOKEN` with **Turnstile Sites Write** is set; guided
   copy-paste otherwise), generates the session signing key, and writes all 8
-  secrets in one bulk call — they never touch disk or argv.
+  secrets in one bulk call — they never touch disk or argv. The wizard keeps
+  the default Workers AI provider (no API key needed, billed to your
+  Cloudflare account, Kimi K2.7 Code by default); to use Anthropic or an
+  OpenAI-compatible endpoint instead, see **Configure the LLM provider** in
+  Manual setup below.
 
 When the wizard finishes: install the GitHub App on a repo, open a test PR,
 and walk the E2E checklist at the bottom of this file.
