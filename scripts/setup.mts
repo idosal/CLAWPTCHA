@@ -57,6 +57,26 @@ if (!accountId) {
 }
 console.log(`✓ Cloudflare auth OK (account ${accountId.slice(0, 8)}…)`);
 
+// ---------- Phase 1.5: re-run guard ----------
+// Probe for a prior setup before doing any work. `wrangler secret list`
+// fails when the Worker has never been deployed — treat any probe failure
+// as "no prior setup" and continue silently. Substring check keeps this
+// immune to banner noise around the JSON output.
+let alreadySetUp = false;
+try {
+  alreadySetUp = wrangler(["secret", "list", "--format", "json"], { quiet: true }).includes("GITHUB_APP_ID");
+} catch { /* never deployed (or transient failure) — fresh setup */ }
+if (alreadySetUp) {
+  console.log(`\n⚠ This Worker already has GITHUB_APP_ID set — it looks like setup already ran.
+Continuing will register a NEW GitHub App and replace ALL secrets; the existing app will be orphaned (delete it at github.com/settings/apps).`);
+  const answer = await ask("Type 'replace' to continue, anything else to abort");
+  if (answer !== "replace") {
+    console.log("Nothing changed.");
+    rl.close();
+    process.exit(0);
+  }
+}
+
 // ---------- Phase 2: deploy + discover URL ----------
 banner("Deploy (provisions D1 automatically, runs migrations)");
 let deployOut = "";
@@ -92,6 +112,13 @@ interface AppConfig {
 }
 
 const appConfig = await new Promise<AppConfig>((resolve, reject) => {
+  // Dead-ends must not hang the wizard: bad state, missing code, and a
+  // never-arriving callback all reject (after responding to the browser).
+  const timeout = setTimeout(() => {
+    fail(new Error("no callback received from GitHub — re-run npm run setup, or create the app manually (README step 2)"));
+  }, 10 * 60 * 1000);
+  const fail = (e: unknown) => { clearTimeout(timeout); server.close(); reject(e); };
+  const done = (cfg: AppConfig) => { clearTimeout(timeout); server.close(); resolve(cfg); };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname === "/") {
@@ -103,10 +130,15 @@ const appConfig = await new Promise<AppConfig>((resolve, reject) => {
     if (url.pathname === "/callback") {
       if (url.searchParams.get("state") !== state) {
         res.writeHead(400).end("state mismatch — re-run npm run setup");
+        fail(new Error("state mismatch in GitHub callback"));
         return;
       }
       const code = url.searchParams.get("code");
-      if (!code) { res.writeHead(400).end("missing code"); return; }
+      if (!code) {
+        res.writeHead(400).end("missing code");
+        fail(new Error("GitHub callback had no code parameter"));
+        return;
+      }
       try {
         const r = await fetch(`https://api.github.com/app-manifests/${code}/conversions`, {
           method: "POST",
@@ -116,12 +148,10 @@ const appConfig = await new Promise<AppConfig>((resolve, reject) => {
         const cfg = (await r.json()) as AppConfig;
         res.writeHead(200, { "content-type": "text/html" })
           .end("<h2>✓ Clawptcha GitHub App created.</h2>You can close this tab and return to the terminal.");
-        server.close();
-        resolve(cfg);
+        done(cfg);
       } catch (e) {
         res.writeHead(500).end("exchange failed — see terminal");
-        server.close();
-        reject(e);
+        fail(e);
       }
       return;
     }
@@ -134,7 +164,8 @@ const appConfig = await new Promise<AppConfig>((resolve, reject) => {
   });
 }).catch((e) => die(
   `GitHub App creation failed (${e instanceof Error ? e.message : e}).\n` +
-  "Manual fallback: README.md → Manual setup → step 2 (dashboard app creation)."
+  "If the app WAS created (check https://github.com/settings/apps), don't create another: open it, note the App ID, generate a private key, and set secrets manually per README Manual setup step 2/4.\n" +
+  "If it wasn't created, follow README Manual setup step 2."
 ));
 
 const privateKeyPkcs8 = pkcs1ToPkcs8(appConfig.pem);
@@ -186,8 +217,17 @@ try {
   wrangler(["secret", "bulk"], { input: JSON.stringify(secrets) });
 } catch {
   console.log("Bulk write failed; falling back to per-secret writes…");
-  for (const [name, value] of Object.entries(secrets)) {
-    wrangler(["secret", "put", name], { input: value });
+  const entries = Object.entries(secrets);
+  let written = 0;
+  try {
+    for (const [name, value] of entries) {
+      wrangler(["secret", "put", name], { input: value });
+      written++;
+    }
+  } catch {
+    // Names only — secret values must never reach logs.
+    const remaining = entries.slice(written).map(([name]) => name).join(", ");
+    die(`${written}/${entries.length} secrets written — set the remaining ones with: wrangler secret put <NAME> (remaining: ${remaining})`);
   }
 }
 console.log(`✓ ${Object.keys(secrets).length} secrets written`);
