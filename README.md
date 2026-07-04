@@ -96,15 +96,46 @@ segment (split on `/`) — no regex, so it can't backtrack pathologically:
 - Every other character — including `?`, `.`, `(` — is matched **literally**,
   not as a special glob/regex character.
 
-## Deploy (operator runbook)
+## Deploy
 
-1. **Create the D1 database and apply migrations.**
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=REPLACE_WITH_PUBLIC_GITHUB_URL)
+<!-- TODO(publish): replace REPLACE_WITH_PUBLIC_GITHUB_URL with this repo's public GitHub URL when it's pushed. -->
+
+Two easy paths — both end with the same wizard:
+
+- **Deploy button (no local tooling to start):** click the button — Cloudflare
+  forks the repo and provisions the Worker, D1 database, and Workers AI
+  binding. Then clone **your fork** and run the wizard for the GitHub-side
+  setup:
+  ```bash
+  npx wrangler login && npm run setup
+  ```
+- **CLI:** clone this repo, then:
+  ```bash
+  npx wrangler login && npm run setup
+  ```
+  The wizard's first deploy auto-provisions D1 and applies migrations; it then
+  creates the GitHub App in one click (manifest flow — app ID, webhook secret,
+  private key, and OAuth credentials all come back from a single exchange, and
+  the key is converted to PKCS#8 for you), sets up Turnstile (automatic if
+  `CLOUDFLARE_API_TOKEN` with **Turnstile Sites Write** is set; guided
+  copy-paste otherwise), generates the session signing key, and writes all 8
+  secrets in one bulk call — they never touch disk or argv.
+
+When the wizard finishes: install the GitHub App on a repo, open a test PR,
+and walk the E2E checklist at the bottom of this file.
+
+### Manual setup (what the wizard does)
+
+If you prefer doing it by hand, or a wizard phase fails and points you here:
+
+1. **Deploy (D1 is auto-provisioned) and apply migrations.**
    ```bash
-   npx wrangler d1 create clawptcha
-   # paste the returned database_id into wrangler.jsonc (d1_databases[0].database_id)
-   npm run db:migrate        # applies migrations/ to the remote D1
+   npm run deploy            # deploys and applies migrations/ to the remote D1
    npm run db:migrate:local  # optional, for local `wrangler dev`
    ```
+   The D1 binding in `wrangler.jsonc` has no `database_id` — Wrangler creates
+   the database on first deploy.
 
 2. **Create a GitHub App** (github.com → Settings → Developer settings → GitHub Apps):
    - Webhook URL: `https://<your-worker>/webhook`; webhook secret = the value
@@ -160,14 +191,12 @@ segment (split on `/`) — no regex, so it can't backtrack pathologically:
 
    Also confirm `APP_BASE_URL` in `wrangler.jsonc` matches your Worker's URL.
 
-5. **Deploy.**
-   ```bash
-   npm run deploy
-   ```
+5. **Background sweeps.**
    A cron trigger (`*/15 * * * *`, already in `wrangler.jsonc`) runs
    `sweepStaleChallenges` to purge old rate-limit events and sessions and to
    neutralize challenges that have gone stale (no quiz attempt in 24h) or
-   whose terminal check-run update failed to land.
+   whose terminal check-run update failed to land. No extra setup — the deploy
+   in step 1 registers the cron.
 
 ## Data custody & security
 
