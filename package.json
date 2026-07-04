@@ -6,11 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy && wrangler d1 migrations apply DB --remote",
+    "setup": "tsx scripts/setup.mts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "db:migrate:local": "wrangler d1 migrations apply clawptcha --local",
-    "db:migrate": "wrangler d1 migrations apply clawptcha --remote"
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate": "wrangler d1 migrations apply DB --remote"
   },
   "dependencies": {
     "hono": "^4.6.0",

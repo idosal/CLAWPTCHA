@@ -1,0 +1,18 @@
+// TEST-ONLY twin of wrangler.jsonc for @cloudflare/vitest-pool-workers, which requires a database_id. Keep every other field in sync with wrangler.jsonc when it changes.
+{
+  "name": "clawptcha",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-06", // bump alongside wrangler upgrades
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    // dummy id: the vitest pool refuses a D1 binding without one (test/wrangler-config.test.ts polices drift)
+    { "binding": "DB", "database_name": "clawptcha", "database_id": "00000000-0000-0000-0000-000000000000" }
+  ],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": {
+    "APP_BASE_URL": "https://clawptcha.example.workers.dev",
+    "LLM_PROVIDER": "workers-ai",
+    "LLM_MODEL": "@cf/moonshotai/kimi-k2.7-code"
+  }
+}

@@ -4,7 +4,10 @@
   "compatibility_date": "2025-09-06", // bump alongside wrangler upgrades
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
-    { "binding": "DB", "database_name": "clawptcha", "database_id": "REPLACE_AFTER_wrangler_d1_create" }
+    // no database_id: Wrangler auto-provisions the database on first deploy
+    // (also lets the Deploy-to-Cloudflare button provision it).
+    // Tests use wrangler.test.jsonc (the pool requires a database_id).
+    { "binding": "DB", "database_name": "clawptcha" }
   ],
   "ai": { "binding": "AI" },
   "triggers": { "crons": ["*/15 * * * *"] },
