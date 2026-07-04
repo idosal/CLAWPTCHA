@@ -1,7 +1,13 @@
 import type { Env } from "../types";
 import type { GitHubApi } from "./api";
-import { parseConfig, resolveConfig, type ClawptchaConfig } from "../config";
+import {
+  getLinkedIssueMatchExemption,
+  parseConfig,
+  resolveConfig,
+  type ClawptchaConfig,
+} from "../config";
 import { evaluateExemption } from "../policy/exemptions";
+import { evaluateLinkedIssueExemption } from "../policy/linked-issue";
 import {
   getChallengeByPr, getLatestChallengeForPr, hasPassedChallenge,
   insertChallenge, setChallengeStatus, supersedeOldChallenges,
@@ -79,9 +85,33 @@ export async function handlePullRequestEvent(
   if (exemption.exempt) {
     await api.createCheckRun(repo, {
       name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
-      output: { title: "Exempt", summary: `Auto-passed: ${exemption.reason}.` },
+      output: { title: "Exempt", summary: `No challenge required: ${exemption.reason}.` },
     });
     return;
+  }
+
+  const linkedIssueCfg = getLinkedIssueMatchExemption(cfg);
+  if (linkedIssueCfg) {
+    const linkedIssueExemption = await evaluateLinkedIssueExemption(
+      {
+        repo,
+        title: pr.title,
+        body: pr.body,
+        changedFiles,
+      },
+      linkedIssueCfg,
+      {
+        getIssue: (issueRepo, issueNumber) => api.getIssue(issueRepo, issueNumber),
+        getUserPermission: (issueRepo, username) => api.getUserPermission(issueRepo, username),
+      }
+    );
+    if (linkedIssueExemption.exempt) {
+      await api.createCheckRun(repo, {
+        name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
+        output: { title: "Exempt", summary: `No challenge required: ${linkedIssueExemption.reason}.` },
+      });
+      return;
+    }
   }
 
   // synchronize with an existing pass and rechallenge_on_push=false → keep the pass.

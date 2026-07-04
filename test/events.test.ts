@@ -14,6 +14,7 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
     getPrDiff: vi.fn(async () => "diff --git a/src/app.ts b/src/app.ts\n+code"),
     getPr: vi.fn(async (): Promise<PrDetails> => pr),
     listPrFiles: vi.fn(async () => ["src/app.ts"]),
+    getIssue: vi.fn(async () => null),
     getFileContent: vi.fn(async () => null), // no clawptcha.yml → defaults
     upsertPrComment: vi.fn(async () => {}),
     getUserPermission: vi.fn(async () => "none"),
@@ -75,12 +76,49 @@ describe("handlePullRequestEvent", () => {
     expect(ch?.status).toBe("ready");
   });
 
-  it("auto-passes exempt PRs (docs-only) with a success check and no challenge row", async () => {
+  it("exempts docs-only PRs with a success check and no challenge row", async () => {
     const api = stubApi({ listPrFiles: vi.fn(async () => ["docs/x.md", "README.md"]) });
     const n = uniq + 3;
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
     expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
       status: "completed", conclusion: "success",
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("exempts a PR that matches a trusted linked issue", async () => {
+    const yaml = [
+      "exemptions:",
+      "  - type: linked_issue_match",
+      "    min_match_score: 0.7",
+      "",
+    ].join("\n");
+    const api = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      getPr: vi.fn(async () => ({
+        ...pr,
+        title: "Implement dashboard dark mode",
+        body: "Fixes #12",
+      })),
+      listPrFiles: vi.fn(async () => ["src/dashboard/theme.ts"]),
+      getIssue: vi.fn(async () => ({
+        repo: "o/r",
+        number: 12,
+        title: "Add dark mode to the dashboard",
+        body: "Users need the dashboard to switch to a dark theme.",
+        authorLogin: "maintainer",
+        authorAssociation: "MEMBER",
+        assignees: [],
+        labels: [],
+        isPullRequest: false,
+      })),
+    });
+    const n = uniq + 11;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+    expect(api.getIssue).toHaveBeenCalledWith("o/r", 12);
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed", conclusion: "success",
+      output: expect.objectContaining({ title: "Exempt" }),
     }));
     expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
   });
@@ -105,7 +143,7 @@ describe("handlePullRequestEvent", () => {
     p2.action = "synchronize";
     const api2 = stubApi({ getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })) });
     await handlePullRequestEvent(testEnv, api2, p2);
-    // rechallenge_on_push=false → new sha auto-passes because prior pass exists
+    // rechallenge_on_push=false → new sha keeps success because prior pass exists
     expect(api2.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
       head_sha: "sha2", status: "completed", conclusion: "success",
     }));

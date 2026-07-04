@@ -21,6 +21,18 @@ export interface PrDetails {
   body: string | null;
 }
 
+export interface IssueDetails {
+  repo: string;
+  number: number;
+  title: string;
+  body: string | null;
+  authorLogin: string;
+  authorAssociation: string;
+  assignees: string[];
+  labels: string[];
+  isPullRequest: boolean;
+}
+
 export class GitHubApi {
   constructor(
     private token: string,
@@ -101,6 +113,26 @@ export class GitHubApi {
     const res = await this.req(`/repos/${repo}/pulls/${prNumber}/files?per_page=100`);
     if (!res.ok) throw new Error(`listPrFiles ${res.status}`);
     return ((await res.json()) as Array<{ filename: string }>).map((f) => f.filename);
+  }
+
+  async getIssue(repo: string, issueNumber: number): Promise<IssueDetails | null> {
+    const res = await this.req(`/repos/${repo}/issues/${issueNumber}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`getIssue ${res.status}`);
+    const issue = (await res.json()) as any;
+    return {
+      repo,
+      number: issue.number,
+      title: issue.title,
+      body: issue.body ?? null,
+      authorLogin: issue.user.login,
+      authorAssociation: issue.author_association,
+      assignees: (issue.assignees ?? []).map((u: { login: string }) => u.login),
+      labels: (issue.labels ?? []).map((label: string | { name: string }) =>
+        typeof label === "string" ? label : label.name
+      ),
+      isPullRequest: Boolean(issue.pull_request),
+    };
   }
 
   async getFileContent(repo: string, path: string, ref: string): Promise<string | null> {
