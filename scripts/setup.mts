@@ -46,8 +46,16 @@ try {
 } catch {
   die("Not logged in to Cloudflare. Run: npx wrangler login  — then re-run npm run setup");
 }
+// If whoami lists multiple accounts, first match silently picks the first —
+// acceptable for a wizard: deploy uses wrangler's own account resolution, and
+// accountId only feeds the app-name suffix and the Turnstile API call.
 const accountId = (whoami.match(/([0-9a-f]{32})/) ?? [])[1];
-console.log(`✓ Cloudflare auth OK${accountId ? ` (account ${accountId.slice(0, 8)}…)` : ""}`);
+// wrangler whoami exits 0 even when unauthenticated, so the try/catch above
+// only catches hard failures — detect the logged-out case by the missing id.
+if (!accountId) {
+  die("Not logged in to Cloudflare (wrangler whoami shows no account). Run: npx wrangler login  — then re-run npm run setup");
+}
+console.log(`✓ Cloudflare auth OK (account ${accountId.slice(0, 8)}…)`);
 
 // ---------- Phase 2: deploy + discover URL ----------
 banner("Deploy (provisions D1 automatically, runs migrations)");
@@ -75,7 +83,7 @@ if (patched.changed) {
 
 // ---------- Phase 3: GitHub App via manifest flow ----------
 banner("GitHub App");
-const appName = await ask("GitHub App name", `clawptcha-${(accountId ?? randomBytes(3).toString("hex")).slice(0, 6)}`);
+const appName = await ask("GitHub App name", `clawptcha-${accountId.slice(0, 6)}`);
 const state = randomBytes(16).toString("hex");
 
 interface AppConfig {
@@ -138,7 +146,7 @@ let turnstileSiteKey = "";
 let turnstileSecretKey = "";
 const host = new URL(baseUrl).hostname;
 const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-if (apiToken && accountId) {
+if (apiToken) {
   try {
     const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/challenges/widgets`, {
       method: "POST",
