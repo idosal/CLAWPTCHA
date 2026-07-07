@@ -28,12 +28,14 @@ describe("GitHubApi", () => {
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
     const id = await api.createCheckRun("o/r", {
       name: "clawptcha", head_sha: "abc", status: "queued",
+      details_url: "https://clawptcha.example.com/challenge/ch1",
       output: { title: "t", summary: "s" },
     });
     expect(id).toBe(42);
     const [url, init] = f.mock.calls[0];
     expect(String(url)).toBe("https://api.github.com/repos/o/r/check-runs");
     expect((init!.headers as Record<string, string>).authorization).toBe("Bearer tok");
+    expect(JSON.parse(String(init!.body)).details_url).toBe("https://clawptcha.example.com/challenge/ch1");
   });
 
   it("fetches a PR diff with the diff media type", async () => {

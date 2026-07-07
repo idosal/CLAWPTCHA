@@ -8,6 +8,7 @@ export interface CheckRunCreate {
   head_sha: string;
   status: "queued" | "in_progress" | "completed";
   conclusion?: "success" | "failure" | "neutral";
+  details_url?: string;
   output?: { title: string; summary: string };
 }
 

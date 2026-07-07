@@ -283,15 +283,16 @@ export async function handlePullRequestEvent(
   const status = needsApproval ? "awaiting_approval" : "ready";
 
   const challengeId = randomToken();
+  const url = challengeUrl(env, challengeId);
   const checkRunId = await api.createCheckRun(repo, {
-    name: CHECK_NAME, head_sha: headSha, status: "queued",
+    name: CHECK_NAME, head_sha: headSha, status: "queued", details_url: url,
     output: {
       title: needsApproval ? "Awaiting maintainer approval" : "Awaiting challenge",
       summary:
         (needsApproval
           ? "A maintainer must approve the challenge (`/clawptcha approve`) before the author can take it."
           : "The PR author must pass a comprehension quiz. Link in the PR comment.") +
-        `\n\nChallenge link: ${challengeUrl(env, challengeId)}`,
+        `\n\nChallenge link: ${url}`,
     },
   });
 

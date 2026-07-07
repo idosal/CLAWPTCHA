@@ -76,6 +76,7 @@ describe("handlePullRequestEvent", () => {
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
     expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
       name: "clawptcha", head_sha: "abc123", status: "queued",
+      details_url: expect.stringContaining("/challenge/"),
     }));
     expect(api.upsertPrComment).toHaveBeenCalled();
     const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
