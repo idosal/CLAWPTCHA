@@ -91,6 +91,30 @@ describe("onChallengeResolved", () => {
     expect(patch.output.title).toBe("Passed");
   });
 
+  it("suppresses outcome comments when output comments are quiet", async () => {
+    const api = stubApi();
+    await onChallengeResolved(testEnv, {
+      challenge: passedChallenge(), outcome: "passed", score: 4, total: 4,
+      telemetry: null, cfg: parseConfig("output:\n  comments: quiet\n"),
+    }, async () => api);
+
+    expect(api.updateCheckRun).toHaveBeenCalled();
+    expect(api.upsertPrComment).not.toHaveBeenCalled();
+  });
+
+  it("can disable flagged labels while preserving the check-run warning", async () => {
+    const api = stubApi();
+    await onChallengeResolved(testEnv, {
+      challenge: passedChallenge(), outcome: "passed", score: 4, total: 4,
+      telemetry: scriptedTelemetry, cfg: parseConfig("output:\n  labels: false\n"),
+    }, async () => api);
+
+    expect(api.ensureLabel).not.toHaveBeenCalled();
+    expect(api.addLabels).not.toHaveBeenCalled();
+    const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(patch.output.title).toBe("Passed — but the quiz looks scripted");
+  });
+
   it("withholds the risk report on a retryable failure (no mid-challenge signal feedback)", async () => {
     const api = stubApi();
     await onChallengeResolved(testEnv, {

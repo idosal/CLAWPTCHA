@@ -1,5 +1,6 @@
 import { validateQuiz, QUIZ_JSON_SCHEMA, type Quiz } from "./schema";
 import type { QuizProvider } from "./providers";
+import type { InvestigationArtifact } from "./investigate";
 
 const SYSTEM_PROMPT = `You generate SHORT questions that check whether the PR author understands
 WHAT their change accomplishes — its purpose and its effect — NOT how the code works.
@@ -65,18 +66,11 @@ export function buildGenerationPrompt(
 
 export type GenerateResult = { ok: true; quiz: Quiz } | { ok: false; error: string };
 
-export async function generateQuiz(
-  provider: QuizProvider,
-  diff: string,
-  title: string,
-  body: string | null,
-  files: string[],
-  maxContextTokens: number | null,
-  questionCount = 4
+async function generateQuizWithPrompt(
+  provider: QuizProvider, prompt: string, questionCount: number, attempts = 2
 ): Promise<GenerateResult> {
-  const prompt = buildGenerationPrompt(diff, title, body, files, maxContextTokens, questionCount);
   let lastError = "unknown";
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const result = await provider.complete({
       system: SYSTEM_PROMPT,
       prompt,
@@ -91,4 +85,56 @@ export async function generateQuiz(
     lastError = validated.error;
   }
   return { ok: false, error: lastError };
+}
+
+export async function generateQuiz(
+  provider: QuizProvider,
+  diff: string,
+  title: string,
+  body: string | null,
+  files: string[],
+  maxContextTokens: number | null,
+  questionCount = 4,
+  attempts = 2
+): Promise<GenerateResult> {
+  const prompt = buildGenerationPrompt(diff, title, body, files, maxContextTokens, questionCount);
+  return generateQuizWithPrompt(provider, prompt, questionCount, attempts);
+}
+
+export function buildInvestigatedGenerationPrompt(
+  investigation: InvestigationArtifact,
+  title: string,
+  body: string | null,
+  files: string[],
+  questionCount = 4
+): string {
+  return [
+    `PR title: ${title}`,
+    `PR description:\n${body ?? "(none)"}`,
+    `Changed files: ${files.join(", ")}`,
+    "",
+    "Investigation artifact:",
+    "```json",
+    JSON.stringify(investigation, null, 2),
+    "```",
+    "",
+    "Use the investigation artifact as the source of truth. Ask about the PR's intent, behavior changes, affected surfaces, and risk/blast radius.",
+    "Do not ask about exact file paths, symbols, line-level code behavior, or implementation trivia.",
+    `Question count: ${questionCount}`,
+    "Question types: consequence_mcq, blast_radius_multi, false_claim.",
+    "Generate the quiz now.",
+  ].join("\n");
+}
+
+export async function generateQuizFromInvestigation(
+  provider: QuizProvider,
+  investigation: InvestigationArtifact,
+  title: string,
+  body: string | null,
+  files: string[],
+  questionCount = 4,
+  attempts = 2
+): Promise<GenerateResult> {
+  const prompt = buildInvestigatedGenerationPrompt(investigation, title, body, files, questionCount);
+  return generateQuizWithPrompt(provider, prompt, questionCount, attempts);
 }

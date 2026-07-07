@@ -32,6 +32,16 @@ function wrangler(args: string[], opts: { input?: string; quiet?: boolean } = {}
   return res.stdout ?? "";
 }
 
+function buildWorker(): void {
+  const res = spawnSync("npm", ["run", "build"], { stdio: "inherit" });
+  if (res.status !== 0) throw new Error(`npm run build failed (exit ${res.status})`);
+}
+
+function deployWorker(): string {
+  buildWorker();
+  return wrangler(["deploy"]);
+}
+
 function openBrowser(url: string): void {
   const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
   const res = spawnSync(cmd, [url], { stdio: "ignore" });
@@ -81,7 +91,7 @@ Continuing will register a NEW GitHub App and replace ALL secrets; the existing 
 banner("Deploy (provisions D1 automatically, runs migrations)");
 let deployOut = "";
 try {
-  deployOut = wrangler(["deploy"]);
+  deployOut = deployWorker();
   wrangler(["d1", "migrations", "apply", "DB", "--remote"]);
 } catch {
   die("Deploy failed. Fix the error above, or follow the Manual setup section in README.md, then re-run.");
@@ -235,7 +245,7 @@ console.log(`✓ ${Object.keys(secrets).length} secrets written`);
 // ---------- Phase 7: finalize ----------
 if (needsRedeploy) {
   banner("Redeploy (APP_BASE_URL changed)");
-  wrangler(["deploy"]);
+  deployWorker();
 }
 banner("Done");
 console.log(`Worker:      ${baseUrl}

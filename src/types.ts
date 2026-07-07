@@ -1,5 +1,6 @@
 export interface Env {
   DB: D1Database;
+  ASSETS?: Fetcher;
   AI?: Ai;
   APP_BASE_URL: string;
   LLM_PROVIDER: "workers-ai" | "anthropic" | "openai-compat";
@@ -7,6 +8,10 @@ export interface Env {
   LLM_API_KEY?: string;
   LLM_BASE_URL?: string;
   AI_GATEWAY_ID?: string;
+  FLUE_INVESTIGATOR?: Fetcher;
+  FLUE_INVESTIGATOR_URL?: string;
+  FLUE_INVESTIGATOR_SECRET?: string;
+  FLUE_INVESTIGATOR_TIMEOUT_MS?: string;
   GITHUB_APP_ID: string;
   GITHUB_PRIVATE_KEY: string;
   GITHUB_WEBHOOK_SECRET: string;
@@ -39,4 +44,17 @@ export interface Challenge {
   cooldown_until: string | null;
   config_json: string;
   created_at: string;
+}
+
+export interface PrInvestigation {
+  id: string;
+  repo_full_name: string;
+  pr_number: number;
+  head_sha: string;
+  source: "worker" | "flue";
+  status: "ready" | "failed";
+  artifact_json: string;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 }

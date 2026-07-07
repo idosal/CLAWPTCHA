@@ -45,6 +45,45 @@ describe("GitHubApi", () => {
     expect((init!.headers as Record<string, string>).accept).toBe("application/vnd.github.diff");
   });
 
+  it("paginates PR file details", async () => {
+    const firstPage = Array.from({ length: 100 }, (_, i) => ({
+      filename: `src/${i}.ts`,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      changes: 1,
+      patch: `+${i}`,
+    }));
+    const secondPage = [{
+      filename: "src/final.ts",
+      status: "added",
+      additions: 3,
+      deletions: 0,
+      changes: 3,
+    }];
+    const f = vi.fn(async (url: RequestInfo | URL) => {
+      const page = new URL(String(url)).searchParams.get("page");
+      return new Response(JSON.stringify(page === "2" ? secondPage : firstPage), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    const files = await api.listPrFileDetails("o/r", 7);
+
+    expect(files).toHaveLength(101);
+    expect(files.at(-1)).toEqual({
+      filename: "src/final.ts",
+      status: "added",
+      additions: 3,
+      deletions: 0,
+      changes: 3,
+      patch: null,
+    });
+    expect(String(f.mock.calls[0][0])).toContain("page=1");
+    expect(String(f.mock.calls[1][0])).toContain("page=2");
+  });
+
   it("returns null for a missing config file (404)", async () => {
     const f = mockFetch(404, { message: "Not Found" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
@@ -55,6 +94,24 @@ describe("GitHubApi", () => {
     const f = mockFetch(200, { content: btoa("pass_threshold: 4\n"), encoding: "base64" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
     expect(await api.getFileContent("o/r", ".github/clawptcha.yml", "main")).toBe("pass_threshold: 4\n");
+  });
+
+  it("returns both legacy permission and GitHub role name for collaborators", async () => {
+    const f = mockFetch(200, { permission: "write", role_name: "maintain" });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    expect(await api.getUserPermission("o/r", "octocat")).toEqual({
+      permission: "write",
+      role_name: "maintain",
+    });
+  });
+
+  it("falls back to none when collaborator permission lookup is unavailable", async () => {
+    const f = mockFetch(404, { message: "Not Found" });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    expect(await api.getUserPermission("o/r", "octocat")).toEqual({
+      permission: "none",
+      role_name: "none",
+    });
   });
 
   it("upserts the clawptcha PR comment (updates when marker found)", async () => {

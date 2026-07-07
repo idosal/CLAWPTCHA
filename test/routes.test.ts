@@ -30,6 +30,50 @@ describe("POST /webhook", () => {
   });
 });
 
+describe("GET /", () => {
+  it("serves the public CLAWPTCHA website", async () => {
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(new Request("https://clawptcha.example.com/"), testEnv, ctx);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain("CLAWPTCHA");
+    expect(html).toContain("Deploy to Cloudflare");
+    expect(html).toContain("clawptcha.example.com");
+  });
+});
+
+describe("GET /docs", () => {
+  it("redirects the bare docs path to the Starlight root", async () => {
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(new Request("https://clawptcha.example.com/docs"), testEnv, ctx);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/docs/");
+  });
+
+  it("serves Starlight docs through the assets binding", async () => {
+    const docsEnv = {
+      ...testEnv,
+      ASSETS: {
+        fetch: async (request: Request) => {
+          const url = new URL(request.url);
+          return new Response(`docs asset ${url.pathname}`, {
+            headers: { "content-type": "text/html; charset=utf-8" },
+          });
+        },
+      },
+    } as unknown as Env;
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(new Request("https://clawptcha.example.com/docs/"), docsEnv, ctx);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(await res.text()).toBe("docs asset /docs/");
+  });
+});
+
 describe("GET /challenge/:id", () => {
   it("404s for unknown challenge ids", async () => {
     const ctx = createExecutionContext();
@@ -75,6 +119,48 @@ describe("challengeDeps.generateQuiz fail-open seam", () => {
       );
     } finally {
       errorSpy.mockRestore();
+    }
+  });
+
+  it("does not fall back to direct diff generation when a large Flue investigation fails", async () => {
+    const envWithFlue = {
+      ...testEnv,
+      LLM_PROVIDER: "openai-compat",
+      LLM_BASE_URL: "https://llm.example/v1",
+      FLUE_INVESTIGATOR_URL: "https://flue.example",
+      FLUE_INVESTIGATOR_SECRET: "secret",
+    } as unknown as Env;
+    const fetchCalls: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = String(input);
+      fetchCalls.push(url);
+      if (url.startsWith("https://flue.example/")) {
+        return new Response(JSON.stringify({
+          result: { ok: false, error: "agent could not inspect PR" },
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const deps = challengeDeps(envWithFlue);
+      const result = await deps.generateQuiz({
+        ...fakeCtx,
+        repoFullName: "o/r",
+        prNumber: 9991,
+        headSha: "flue-fail-sha",
+        changedLines: DEFAULT_CONFIG.context.large_pr.changed_lines,
+      }, DEFAULT_CONFIG);
+
+      expect(result).toEqual({ ok: false, error: "agent could not inspect PR" });
+      expect(fetchCalls).toEqual(["https://flue.example/workflows/investigate-pr?wait=result"]);
+      const row = await testEnv.DB.prepare(
+        "SELECT source, status FROM pr_investigations WHERE repo_full_name='o/r' AND pr_number=9991 AND head_sha='flue-fail-sha'"
+      ).first<{ source: string; status: string }>();
+      expect(row).toEqual({ source: "flue", status: "failed" });
+    } finally {
+      errorSpy.mockRestore();
+      vi.unstubAllGlobals();
     }
   });
 });

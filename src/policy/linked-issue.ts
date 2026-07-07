@@ -1,4 +1,6 @@
 import type { LinkedIssueMatchExemption } from "../config";
+import type { RepositoryAccess } from "../github/permissions";
+import { matchRepositoryAccess } from "../github/permissions";
 
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const TRUSTED_PERMISSIONS = new Set(["admin", "maintain", "write"]);
@@ -36,7 +38,7 @@ export interface LinkedIssuePrFacts {
 
 export interface LinkedIssueDeps {
   getIssue(repo: string, issueNumber: number): Promise<IssueFacts | null>;
-  getUserPermission(repo: string, username: string): Promise<string>;
+  getUserPermission(repo: string, username: string): Promise<RepositoryAccess>;
 }
 
 export type LinkedIssueExemptionResult =
@@ -95,7 +97,7 @@ async function hasTrustedSignal(
 
   for (const login of issue.assignees.slice(0, 5)) {
     const permission = await deps.getUserPermission(issue.repo, login);
-    if (TRUSTED_PERMISSIONS.has(permission)) return true;
+    if (matchRepositoryAccess(permission, TRUSTED_PERMISSIONS)) return true;
   }
   return false;
 }

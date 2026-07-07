@@ -1,3 +1,5 @@
+import type { RepositoryAccessDetails } from "./permissions";
+
 const API = "https://api.github.com";
 const COMMENT_MARKER = "<!-- clawptcha -->";
 
@@ -15,6 +17,7 @@ export interface PrDetails {
   author_login: string;
   author_type: "User" | "Bot";
   author_association: string;
+  draft: boolean;
   additions: number;
   deletions: number;
   title: string;
@@ -31,6 +34,15 @@ export interface IssueDetails {
   assignees: string[];
   labels: string[];
   isPullRequest: boolean;
+}
+
+export interface PrFileDetails {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch: string | null;
 }
 
 export class GitHubApi {
@@ -102,6 +114,7 @@ export class GitHubApi {
       author_login: p.user.login,
       author_type: p.user.type === "Bot" ? "Bot" : "User",
       author_association: p.author_association,
+      draft: Boolean(p.draft),
       additions: p.additions,
       deletions: p.deletions,
       title: p.title,
@@ -110,9 +123,32 @@ export class GitHubApi {
   }
 
   async listPrFiles(repo: string, prNumber: number): Promise<string[]> {
-    const res = await this.req(`/repos/${repo}/pulls/${prNumber}/files?per_page=100`);
-    if (!res.ok) throw new Error(`listPrFiles ${res.status}`);
-    return ((await res.json()) as Array<{ filename: string }>).map((f) => f.filename);
+    return (await this.listPrFileDetails(repo, prNumber)).map((f) => f.filename);
+  }
+
+  async listPrFileDetails(repo: string, prNumber: number): Promise<PrFileDetails[]> {
+    const files: PrFileDetails[] = [];
+    for (let page = 1; ; page++) {
+      const res = await this.req(`/repos/${repo}/pulls/${prNumber}/files?per_page=100&page=${page}`);
+      if (!res.ok) throw new Error(`listPrFiles ${res.status}`);
+      const batch = (await res.json()) as Array<{
+        filename: string;
+        status: string;
+        additions: number;
+        deletions: number;
+        changes: number;
+        patch?: string;
+      }>;
+      files.push(...batch.map((f) => ({
+        filename: f.filename,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+        changes: f.changes,
+        patch: f.patch ?? null,
+      })));
+      if (batch.length < 100) return files;
+    }
   }
 
   async getIssue(repo: string, issueNumber: number): Promise<IssueDetails | null> {
@@ -189,10 +225,13 @@ export class GitHubApi {
     throw new Error(`ensureLabel POST ${created.status}: ${await created.text()}`);
   }
 
-  // Permission of a user on a repo ("admin" | "write" | "read" | "none").
-  async getUserPermission(repo: string, username: string): Promise<string> {
+  async getUserPermission(repo: string, username: string): Promise<RepositoryAccessDetails> {
     const res = await this.req(`/repos/${repo}/collaborators/${encodeURIComponent(username)}/permission`);
-    if (!res.ok) return "none";
-    return ((await res.json()) as { permission: string }).permission;
+    if (!res.ok) return { permission: "none", role_name: "none" };
+    const data = (await res.json()) as { permission?: string; role_name?: string | null };
+    return {
+      permission: data.permission ?? "none",
+      role_name: data.role_name ?? data.permission ?? "none",
+    };
   }
 }

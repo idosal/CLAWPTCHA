@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { generateQuiz, buildGenerationPrompt, capContext } from "../src/quiz/generate";
+import {
+  generateQuiz,
+  generateQuizFromInvestigation,
+  buildGenerationPrompt,
+  buildInvestigatedGenerationPrompt,
+  capContext,
+} from "../src/quiz/generate";
 import type { QuizProvider, CompletionParams, CompletionResult } from "../src/quiz/providers";
 
 const goodQuizJson = JSON.stringify({
@@ -98,5 +104,35 @@ describe("buildGenerationPrompt", () => {
   it("includes the configured question count", () => {
     const p = buildGenerationPrompt("diff", "title", null, ["a.ts"], null, 6);
     expect(p).toContain("Question count: 6");
+  });
+});
+
+describe("investigation-backed generation", () => {
+  const investigation = {
+    summary: "Bounds archive download bodies.",
+    intent: "Prevent oversized archive downloads from exhausting memory.",
+    behavior_changes: ["Large archive responses are stopped before they grow without bound."],
+    affected_surfaces: ["Clawhub archive imports"],
+    risk_areas: ["Large downloads can still fail and need a clear error."],
+    evidence: [{ path: "src/infra/clawhub.ts", why_it_matters: "Archive responses are read through a bounded path." }],
+    unknowns: [],
+    quiz_anchors: ["Why archive downloads are bounded"],
+    confidence: "high" as const,
+    mode: "normal" as const,
+  };
+
+  it("builds a prompt from the investigation artifact", () => {
+    const prompt = buildInvestigatedGenerationPrompt(investigation, "title", null, ["src/infra/clawhub.ts"], 4);
+    expect(prompt).toContain("Investigation artifact");
+    expect(prompt).toContain("Prevent oversized archive downloads");
+    expect(prompt).not.toContain("```diff");
+  });
+
+  it("generates and validates a quiz from an investigation artifact", async () => {
+    const { provider, complete } = stubProvider([{ ok: true, text: goodQuizJson }]);
+    const result = await generateQuizFromInvestigation(provider, investigation, "title", null, ["a.ts"], 4, 1);
+    expect(result.ok).toBe(true);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete.mock.calls[0][0].prompt).toContain("Investigation artifact");
   });
 });

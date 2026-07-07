@@ -33,19 +33,40 @@ export async function createAppJwt(appId: string, pkcs8Pem: string, now: Date): 
   return `${header}.${payload}.${b64url(new Uint8Array(sig))}`;
 }
 
-// Installation tokens are cached per installation for ~55 minutes.
-const tokenCache = new Map<number, { token: string; expiresAtMs: number }>();
+export type InstallationTokenPermission = "read" | "write";
+
+export interface InstallationTokenOptions {
+  permissions?: Partial<Record<"contents" | "pull_requests" | "metadata", InstallationTokenPermission>>;
+  repositoryIds?: number[];
+}
+
+// Installation tokens are cached per installation/scope for ~55 minutes.
+const tokenCache = new Map<string, { token: string; expiresAtMs: number }>();
+
+function tokenCacheKey(installationId: number, options?: InstallationTokenOptions): string {
+  const permissions = options?.permissions
+    ? Object.entries(options.permissions).sort(([a], [b]) => a.localeCompare(b))
+    : [];
+  const repositoryIds = [...(options?.repositoryIds ?? [])].sort((a, b) => a - b);
+  return JSON.stringify({ installationId, permissions, repositoryIds });
+}
 
 export async function getInstallationToken(
   appId: string,
   pkcs8Pem: string,
   installationId: number,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = fetch,
+  options?: InstallationTokenOptions
 ): Promise<string> {
-  const cached = tokenCache.get(installationId);
+  const cacheKey = tokenCacheKey(installationId, options);
+  const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAtMs > Date.now() + 60_000) return cached.token;
 
   const jwt = await createAppJwt(appId, pkcs8Pem, new Date());
+  const body: Record<string, unknown> = {};
+  if (options?.permissions) body.permissions = options.permissions;
+  if (options?.repositoryIds) body.repository_ids = options.repositoryIds;
+  const hasBody = Object.keys(body).length > 0;
   const res = await fetchFn(
     `https://api.github.com/app/installations/${installationId}/access_tokens`,
     {
@@ -54,12 +75,14 @@ export async function getInstallationToken(
         authorization: `Bearer ${jwt}`,
         accept: "application/vnd.github+json",
         "user-agent": "clawptcha",
+        ...(hasBody ? { "content-type": "application/json" } : {}),
       },
+      ...(hasBody ? { body: JSON.stringify(body) } : {}),
     }
   );
   if (!res.ok) throw new Error(`installation token failed: ${res.status} ${await res.text()}`);
   const data = (await res.json()) as { token: string; expires_at: string };
-  tokenCache.set(installationId, {
+  tokenCache.set(cacheKey, {
     token: data.token,
     expiresAtMs: new Date(data.expires_at).getTime(),
   });

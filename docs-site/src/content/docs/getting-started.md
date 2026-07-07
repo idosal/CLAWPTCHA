@@ -1,0 +1,108 @@
+---
+title: Getting started
+description: A practical first rollout path for adding CLAWPTCHA to a repository.
+---
+
+Start with a narrow policy, verify the check-run behavior on a few known PRs,
+then tighten path-specific rules only where maintainers actually need them.
+
+## 1. Choose the operating model
+
+For the managed service, install the CLAWPTCHA GitHub App and keep policy in
+the repository. Maintainers control the `.github/clawptcha.yml` file and review
+the resulting check runs.
+
+For self-deploy, run the Cloudflare Worker, D1 database, GitHub App credentials,
+Turnstile keys, and model provider in your own account.
+
+```bash
+npx wrangler login && npm run setup
+```
+
+The Worker can use Workers AI by default. External model providers and the
+optional Flue investigator are advanced deployment choices, not prerequisites
+for the first repository.
+
+## 2. Add the first policy file
+
+Create `.github/clawptcha.yml` on the default branch or the branch you merge
+into. CLAWPTCHA reads policy from the PR's merge target, not from the PR branch.
+The full default policy template is `templates/clawptcha.yml`; this abbreviated
+first policy keeps the same core behavior.
+
+```yaml
+gates:
+  - type: multiple_choice
+    questions: 4
+    pass_threshold: 3
+
+require_approval: first_time
+draft_prs: ignore
+
+signals:
+  - type: honeypot
+    report_only: true
+
+skip_paths: ["docs/**", "*.md"]
+min_changed_lines: 10
+output:
+  comments: normal
+  labels: true
+```
+
+This gives first-time contributors a maintainer checkpoint before the quiz,
+keeps draft PRs quiet until they are ready for review, skips docs-only work,
+and records the default form honeypot signal as review evidence.
+
+## 3. Verify the first scenarios
+
+Before tightening policy, open or replay a few predictable PRs:
+
+- a docs-only PR should get an exempt success check;
+- a first-time contributor PR should wait for `/clawptcha approve`;
+- a normal challenged PR should produce a quiz link, pass, and then post a
+  green attestation check;
+- a failed quiz should enter cooldown and then offer a fresh retry;
+- a new commit after a pass should keep the prior pass with the default
+  `rechallenge.on_push: never`.
+
+If the check reports neutral, treat that as a CLAWPTCHA-side availability or
+generation problem, not as a verdict on the PR.
+
+## 4. Add repository-specific rules
+
+Once the default path is working, add policy where the repository has real
+review risk:
+
+```yaml
+path_rules:
+  - paths: ["src/auth/**", "migrations/**", ".github/workflows/**"]
+    gates:
+      - type: multiple_choice
+        questions: 6
+        pass_threshold: 5
+    require_approval: always
+    max_attempts: 2
+    cooldown_minutes: 30
+```
+
+Use path rules for sensitive areas instead of making every contribution pay the
+same cost.
+
+## 5. Introduce trusted context
+
+When maintainers already plan work in GitHub issues, add issue-backed triage.
+This lets CLAWPTCHA exempt PRs that link to trusted issues and semantically
+match the requested outcome.
+
+```yaml
+exemptions:
+  - type: linked_issue_match
+    require_same_repo: true
+    require_trusted_signal: true
+    min_match_score: 0.7
+    trusted_labels: [accepted, ready]
+```
+
+Prefer labels and assignments your maintainers already use. Avoid adding a
+CLAWPTCHA-only label ceremony unless the repository truly wants that workflow.

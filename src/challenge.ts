@@ -16,7 +16,27 @@ import { evaluateCodeHoneypotSignals } from "./policy/code-honeypot";
 import { telemetrySchema, type Telemetry } from "./risk/report";
 import type { GenerateResult } from "./quiz/generate";
 
-export interface PrContext { diff: string; title: string; body: string | null; files: string[] }
+export interface PrFilePatch {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch: string | null;
+}
+
+export interface PrContext {
+  diff: string;
+  title: string;
+  body: string | null;
+  files: string[];
+  repoFullName?: string;
+  prNumber?: number;
+  headSha?: string;
+  installationId?: number;
+  changedLines?: number;
+  filePatches?: PrFilePatch[];
+}
 
 export interface ResolvedChallenge {
   challenge: Challenge;

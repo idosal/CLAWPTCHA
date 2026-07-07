@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clawptcha archived visual placement exploration</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #eef2f5;
+      --ink: #101827;
+      --muted: #4e5e70;
+      --faint: #708092;
+      --line: #c8d3df;
+      --line-strong: #8ca0b4;
+      --surface: #ffffff;
+      --soft: #f6f8fb;
+      --dark: #071624;
+      --brand: #ff5a36;
+      --brand-soft: #fff1ec;
+      --blue: #1f6ea8;
+      --blue-soft: #e8f3fb;
+      --green: #16815d;
+      --green-soft: #eaf7f1;
+      --slot-bg: #fbfcfd;
+      --radius: 8px;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: var(--page);
+      color: var(--ink);
+      font: 400 1rem/1.45 var(--sans);
+    }
+
+    button { font: inherit; }
+    h1, p { margin: 0; }
+    main { width: min(680px, 100%); }
+
+    .captcha {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 18px 42px rgb(17 24 39 / 14%);
+    }
+
+    .topbar {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--dark);
+      color: white;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 780;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--brand);
+      color: #22110c;
+      font-weight: 850;
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #c9d3df;
+      font-size: .78rem;
+      white-space: nowrap;
+    }
+
+    .timer {
+      min-width: 58px;
+      padding: 6px 10px;
+      border: 1px solid rgb(255 255 255 / 36%);
+      border-radius: 999px;
+      color: white;
+      text-align: center;
+      font: 780 .8rem/1 var(--mono);
+    }
+
+    .body {
+      display: grid;
+      gap: 15px;
+      padding: 20px;
+    }
+
+    .prompt {
+      display: grid;
+      gap: 5px;
+    }
+
+    .kicker {
+      color: #a3331f;
+      font-weight: 780;
+    }
+
+    h1 {
+      font-size: 1.62rem;
+      line-height: 1.12;
+      font-weight: 820;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: .94rem;
+    }
+
+    .object-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--brand-soft);
+    }
+
+    .object-copy {
+      display: grid;
+      gap: 2px;
+    }
+
+    .eyebrow,
+    .slot small,
+    .section-label {
+      color: var(--faint);
+      font: 820 .68rem/1.2 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .object {
+      min-width: 156px;
+      min-height: 54px;
+      display: grid;
+      align-content: center;
+      gap: 3px;
+      padding: 10px 12px;
+      border: 2px solid var(--brand);
+      border-radius: var(--radius);
+      background: white;
+      cursor: grab;
+      user-select: none;
+      box-shadow: 0 8px 18px rgb(255 90 54 / 16%);
+    }
+
+    .object:active {
+      cursor: grabbing;
+      transform: translateY(1px);
+    }
+
+    .object b {
+      font-size: .95rem;
+      line-height: 1.1;
+    }
+
+    .diagram {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+    }
+
+    .map {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .system {
+      display: grid;
+      gap: 8px;
+      min-height: 158px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: white;
+    }
+
+    .system-head {
+      display: grid;
+      justify-items: center;
+      gap: 5px;
+      text-align: center;
+    }
+
+    .system-head strong {
+      font-size: .96rem;
+      line-height: 1.1;
+    }
+
+    .system-head span {
+      color: var(--muted);
+      font-size: .76rem;
+      line-height: 1.18;
+    }
+
+    .slot {
+      min-height: 76px;
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      padding: 9px;
+      border: 2px dashed var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--slot-bg);
+      color: var(--muted);
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .slot b {
+      color: var(--ink);
+      font-size: .88rem;
+      line-height: 1.12;
+    }
+
+    .slot b:empty {
+      display: none;
+    }
+
+    .slot.is-over,
+    .slot:focus-visible {
+      border-color: var(--brand);
+      background: var(--brand-soft);
+    }
+
+    .slot.has-object {
+      border-style: solid;
+      border-color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .feedback {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: .88rem;
+      font-weight: 720;
+    }
+
+    .feedback span {
+      color: var(--ink);
+      font-weight: 760;
+      text-align: right;
+    }
+
+    .fallback {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: .84rem;
+    }
+
+    .fallback button {
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: white;
+      color: var(--ink);
+      font-weight: 740;
+      cursor: pointer;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 20px 18px;
+      border-top: 1px solid var(--line);
+      background: var(--soft);
+    }
+
+    .reset,
+    .verify {
+      min-height: 44px;
+      border-radius: var(--radius);
+      font-weight: 770;
+      cursor: pointer;
+    }
+
+    .reset {
+      min-width: 88px;
+      border: 1px solid var(--line-strong);
+      background: white;
+      color: var(--ink);
+    }
+
+    .verify {
+      min-width: 170px;
+      border: 0;
+      background: var(--brand);
+      color: #2a120a;
+    }
+
+    .verify:disabled {
+      background: #c8d2dc;
+      color: #4f5c68;
+      cursor: not-allowed;
+    }
+
+    .mock-note {
+      margin: 10px auto 0;
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 650;
+      text-align: center;
+    }
+
+    .archive-note {
+      margin: 0 20px 18px;
+      padding: 10px 12px;
+      border: 1px solid #d7b8a7;
+      border-radius: var(--radius);
+      background: #fff7ed;
+      color: #6f3c1f;
+      font-size: .86rem;
+      font-weight: 700;
+    }
+
+    .object:focus-visible,
+    .slot:focus-visible,
+    .fallback button:focus-visible,
+    .reset:focus-visible,
+    .verify:focus-visible {
+      outline: 3px solid #f4a261;
+      outline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .object,
+      .slot,
+      .fallback button,
+      .reset,
+      .verify {
+        transition: border-color .16s ease, background .16s ease, opacity .16s ease, transform .12s ease, filter .16s ease;
+      }
+
+      .verify:not(:disabled):hover {
+        filter: brightness(1.04);
+      }
+    }
+
+    @media (max-width: 560px) {
+      body {
+        align-items: start;
+        padding: 14px;
+      }
+
+      h1 {
+        font-size: 1.42rem;
+      }
+
+      .body {
+        padding: 18px;
+      }
+
+      .object-row,
+      .map {
+        grid-template-columns: 1fr;
+      }
+
+      .object {
+        min-width: 100%;
+      }
+
+      .system {
+        min-height: 132px;
+      }
+
+      .actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .reset,
+      .verify {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="captcha" aria-labelledby="challenge-title">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true">C</div>
+          <span>Clawptcha</span>
+        </div>
+        <div class="meta">
+          <span>Archived exploration</span>
+          <span class="timer">54s</span>
+        </div>
+      </header>
+
+      <div class="body">
+        <div class="prompt">
+          <p class="kicker">One drag</p>
+          <h1 id="challenge-title">Place the new entity in the review model.</h1>
+          <p class="hint">Drag the entity under the part of the system that owns it.</p>
+        </div>
+
+        <div class="object-row">
+          <div class="object-copy">
+            <span class="eyebrow">Move this entity</span>
+            <strong>One of the empty slots below is its home.</strong>
+          </div>
+          <div class="object" draggable="true" tabindex="0" data-object="visual_task">
+            <small class="eyebrow">New entity</small>
+            <b>Visual task</b>
+          </div>
+        </div>
+
+        <div class="diagram" aria-label="System map">
+          <div class="section-label">System map</div>
+          <div class="map">
+            <div class="system">
+              <div class="system-head">
+                <strong>Pull request</strong>
+                <span>changed code</span>
+              </div>
+              <button class="slot" type="button" data-slot="pull_request" aria-label="Slot A under Pull request">
+                <small>Slot A</small>
+                <b></b>
+              </button>
+            </div>
+
+            <div class="system">
+              <div class="system-head">
+                <strong>Challenge</strong>
+                <span>generated task</span>
+              </div>
+              <button class="slot" type="button" data-slot="challenge" aria-label="Slot B under Challenge">
+                <small>Slot B</small>
+                <b></b>
+              </button>
+            </div>
+
+            <div class="system">
+              <div class="system-head">
+                <strong>Attempt</strong>
+                <span>author response</span>
+              </div>
+              <button class="slot" type="button" data-slot="attempt" aria-label="Slot C under Attempt">
+                <small>Slot C</small>
+                <b></b>
+              </button>
+            </div>
+
+            <div class="system">
+              <div class="system-head">
+                <strong>Check run</strong>
+                <span>pass or fail</span>
+              </div>
+              <button class="slot" type="button" data-slot="check_run" aria-label="Slot D under Check run">
+                <small>Slot D</small>
+                <b></b>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="feedback" aria-live="polite">
+          Placed in
+          <span>None</span>
+        </div>
+
+        <div class="fallback">
+          <span>Keyboard fallback available.</span>
+          <button type="button">Choose location</button>
+        </div>
+      </div>
+
+      <footer class="actions">
+        <button class="reset" type="button">Reset</button>
+        <button class="verify" type="button" disabled>Check placement</button>
+      </footer>
+      <p class="archive-note">Decision: do not build this visual gate for v1. Keep multiple-choice and explanation-style challenges.</p>
+    </section>
+    <p class="mock-note">Static mock. A live challenge submits one entity ID and one slot ID.</p>
+  </main>
+  <script>
+    const object = document.querySelector(".object");
+    const slots = [...document.querySelectorAll(".slot")];
+    const feedback = document.querySelector(".feedback span");
+    const verify = document.querySelector(".verify");
+    const reset = document.querySelector(".reset");
+
+    function resetSlot(slot) {
+      slot.classList.remove("has-object");
+      slot.querySelector("small").textContent = slot.dataset.originalSmall || "";
+      slot.querySelector("b").textContent = slot.dataset.originalLabel || "";
+    }
+
+    function place(slot) {
+      slots.forEach(resetSlot);
+      slot.classList.add("has-object");
+      slot.querySelector("small").textContent = "Placed here";
+      slot.querySelector("b").textContent = "Visual task";
+      if (feedback) feedback.textContent = slot.closest(".system")?.querySelector("strong")?.textContent || "Selected";
+      if (verify) verify.disabled = false;
+    }
+
+    function clearPlacement() {
+      slots.forEach(resetSlot);
+      if (feedback) feedback.textContent = "None";
+      if (verify) verify.disabled = true;
+    }
+
+    slots.forEach((slot) => {
+      slot.dataset.originalSmall = slot.querySelector("small")?.textContent || "";
+      slot.dataset.originalLabel = slot.querySelector("b")?.textContent || "";
+      slot.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        slot.classList.add("is-over");
+      });
+      slot.addEventListener("dragleave", () => slot.classList.remove("is-over"));
+      slot.addEventListener("drop", (event) => {
+        event.preventDefault();
+        slot.classList.remove("is-over");
+        if (event.dataTransfer?.getData("text/plain") === "visual_task") place(slot);
+      });
+      slot.addEventListener("click", () => place(slot));
+    });
+
+    object?.addEventListener("dragstart", (event) => {
+      event.dataTransfer?.setData("text/plain", object.dataset.object || "");
+    });
+
+    reset?.addEventListener("click", clearPlacement);
+  </script>
+</body>
+</html>

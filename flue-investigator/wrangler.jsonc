@@ -1,0 +1,17 @@
+{
+  "$schema": "https://workers.cloudflare.com/schema/wrangler.json",
+  "name": "clawptcha-flue-investigator",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "ai": { "binding": "AI" },
+  "exports": {
+    "FlueInvestigatePrWorkflow": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "FlueRegistry": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}

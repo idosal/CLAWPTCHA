@@ -1,0 +1,83 @@
+- main [ref=f1e2] [box=0,0,1440,1426]:
+  - generic [ref=f1e3] [box=0,0,1440,1426]:
+    - navigation "Primary" [ref=f1e4] [box=160,0,1120,66]:
+      - link "CLAWPTCHA home" [ref=f1e5] [cursor=pointer] [box=160,15,149,34]:
+        - /url: /
+        - generic [ref=f1e6] [box=160,15,34,34]: C
+        - generic [ref=f1e7] [box=204,20,105,24]: CLAWPTCHA
+      - generic [ref=f1e8] [box=1120,21,160,23]:
+        - link "Why" [ref=f1e9] [cursor=pointer] [box=1120,21,33,23]:
+          - /url: "#why"
+        - link "Policy" [ref=f1e10] [cursor=pointer] [box=1171,21,45,23]:
+          - /url: "#policy"
+        - link "Install" [ref=f1e11] [cursor=pointer] [box=1234,21,46,23]:
+          - /url: "#install"
+    - region "Proof before review." [ref=f1e12] [box=160,66,1120,532]:
+      - generic [ref=f1e13] [box=160,161,650,351]:
+        - paragraph [ref=f1e14] [box=160,169,315,16]: Yes to contributions. No to slop.
+        - heading "Proof before review." [level=1] [ref=f1e15] [box=160,201,585,170]:
+          - text: Proof before
+          - text: review.
+        - paragraph [ref=f1e16] [box=160,389,587,55]:
+          - text: Welcome real work without rewarding slop.
+          - text: AI is welcome. Unowned changes are not.
+        - generic [ref=f1e17] [box=160,468,650,44]:
+          - link "Use managed free" [ref=f1e18] [cursor=pointer] [box=160,468,181,44]:
+            - /url: "#install"
+          - link "Self-deploy" [ref=f1e19] [cursor=pointer] [box=351,468,129,44]:
+            - /url: https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA
+      - complementary "GitHub Actions policy report example" [ref=f1e20] [box=850,110,430,454]:
+        - text: Required
+        - generic [ref=f1e21] [box=851,111,428,63]:
+          - generic [ref=f1e22] [box=865,132,20,20]: "!"
+          - generic [ref=f1e23] [box=895,123,195,38]
+        - heading "Governance report" [level=2] [ref=f1e26] [box=867,190,396,23]
+        - generic [ref=f1e27] [box=867,223,396,268]:
+          - generic [ref=f1e28] [box=868,224,394,66]
+          - generic [ref=f1e33] [box=868,290,394,67]
+          - generic [ref=f1e38] [box=868,357,394,67]
+          - generic [ref=f1e43] [box=868,423,394,67]
+        - paragraph [ref=f1e48] [box=867,503,396,44]: 1 annotation posted to the PR checks tab.
+    - region "Policy options" [ref=f1e49] [box=160,598,1120,80]:
+      - generic [ref=f1e50] [box=162,600,279,76]:
+        - generic [ref=f1e51] [box=178,616,247,19]: Gates
+        - generic [ref=f1e52] [box=178,640,247,20]: Ask for proof, not permission.
+      - generic [ref=f1e53] [box=441,600,279,76]:
+        - generic [ref=f1e54] [box=459,616,245,19]: Issue trust
+        - generic [ref=f1e55] [box=459,640,245,20]: Trust work with context.
+      - generic [ref=f1e56] [box=720,600,279,76]:
+        - generic [ref=f1e57] [box=738,616,245,19]: Honeypots
+        - generic [ref=f1e58] [box=738,640,245,20]: Flag weird automation.
+      - generic [ref=f1e59] [box=999,600,279,76]:
+        - generic [ref=f1e60] [box=1017,616,245,19]: Fail open
+        - generic [ref=f1e61] [box=1017,640,245,20]: Keep merges unblocked.
+    - generic [ref=f1e62] [box=160,722,1120,623]:
+      - generic [ref=f1e63] [box=160,762,696,125]:
+        - heading "Keep the door open." [level=2] [ref=f1e64] [box=160,762,414,38]
+        - paragraph [ref=f1e65] [box=160,812,650,75]: CLAWPTCHA helps maintainers welcome real contributions without handing review time to contextless PRs. Gates ask for proof, issue-backed work gets trust, and honeypots stay report-only.
+      - complementary "Install CLAWPTCHA" [ref=f1e66] [box=890,762,390,545]:
+        - heading "Run it your way" [level=3] [ref=f1e67] [box=908,780,354,26]
+        - generic [ref=f1e68] [box=908,818,354,87]:
+          - generic [ref=f1e69] [box=908,829,354,24]: Managed free
+          - generic [ref=f1e70] [box=908,856,354,40]: Use the hosted service for open-source repos. No Cloudflare account required.
+        - generic [ref=f1e71] [box=908,917,354,87]:
+          - generic [ref=f1e72] [box=908,928,354,24]: Self-deploy
+          - generic [ref=f1e73] [box=908,955,354,40]: Own the Worker, D1 database, GitHub App, and model provider.
+        - link "Deploy to Cloudflare" [ref=f1e74] [cursor=pointer] [box=908,1017,354,44]:
+          - /url: https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA
+        - paragraph [ref=f1e75] [box=908,1073,354,23]: "Self-deploy CLI path:"
+        - code [ref=f1e76] [box=908,1107,354,44]: npx wrangler login && npm run setup
+        - paragraph [ref=f1e77] [box=908,1164,354,23]:
+          - text: "Managed service origin:"
+          - strong [ref=f1e78] [box=1078,1166,107,18]: 127.0.0.1:8787
+        - paragraph [ref=f1e79] [box=908,1199,354,90]:
+          - text: Author gates live at
+          - code [ref=f1e80] [box=908,1221,354,44]: /challenge/:id
+          - text: .
+    - generic [ref=f1e81] [box=160,1345,1120,81]:
+      - generic [ref=f1e82] [box=160,1369,247,23]: Say yes to contributions. No to slop.
+      - generic [ref=f1e83] [box=944,1369,336,23]:
+        - text: Webhook
+        - code [ref=f1e84] [box=1013,1372,72,18]: /webhook
+        - text: · OAuth
+        - code [ref=f1e85] [box=1144,1372,136,18]: /oauth/callback

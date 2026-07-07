@@ -4,18 +4,34 @@ import type { Env, Challenge } from "./types";
 import { verifyWebhookSignature } from "./github/webhook";
 import { handlePullRequestEvent, handleIssueCommentEvent } from "./github/events";
 import { apiForInstallation, onChallengeResolved, sweepStaleChallenges } from "./resolve";
-import { getChallenge, randomToken } from "./store";
+import { getChallenge, getInvestigationByPr, randomToken, upsertInvestigation } from "./store";
 import { signSessionCookie, verifySessionCookie } from "./ui/session";
 import { authorizeUrl, exchangeCodeForLogin } from "./github/oauth";
-import { startPage, questionPage, resultPage, errorPage, HONEYPOT_FIELD_NAME } from "./ui/pages";
-import { startQuizAttempt, submitAnswer, type ChallengeDeps } from "./challenge";
-import { generateQuiz } from "./quiz/generate";
+import { startPage, questionPage, resultPage, errorPage, homePage, HONEYPOT_FIELD_NAME } from "./ui/pages";
+import { startQuizAttempt, submitAnswer, type ChallengeDeps, type PrContext } from "./challenge";
+import { generateQuiz, generateQuizFromInvestigation } from "./quiz/generate";
 import { redactForClient, type Quiz } from "./quiz/schema";
 import { QUESTION_TIME_LIMIT_MS } from "./quiz/grade";
-import { getMultipleChoiceGate, hasHoneypotSignal, resolveConfig } from "./config";
-import { providerFromEnv } from "./quiz/providers";
+import { getMultipleChoiceGate, hasHoneypotSignal, resolveConfig, type ClawptchaConfig } from "./config";
+import { providerFromEnv, type QuizProvider } from "./quiz/providers";
+import { matchesGlob } from "./policy/exemptions";
+import { chooseInvestigatorSource, investigatePrWithFlue, type InvestigationSource } from "./flue/investigator";
+import {
+  investigatePr,
+  investigationMode,
+  validateInvestigationArtifact,
+  type InvestigationArtifact,
+} from "./quiz/investigate";
 
 const app = new Hono<{ Bindings: Env }>();
+
+async function docsAsset(c: Context<{ Bindings: Env }>): Promise<Response> {
+  if (new URL(c.req.url).pathname === "/docs") return c.redirect("/docs/");
+  if (!c.env.ASSETS) {
+    return c.html(errorPage("Docs unavailable", "The Starlight documentation bundle is not available in this environment."), 503);
+  }
+  return c.env.ASSETS.fetch(c.req.raw);
+}
 
 app.onError((err, c) => {
   console.error("unhandled route error", c.req.path, err);
@@ -65,6 +81,38 @@ function hasSubmittedHoneypot(form: Record<string, unknown>): boolean {
   return raw !== undefined && raw !== null;
 }
 
+function pathIgnored(path: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => matchesGlob(pattern, path));
+}
+
+function filterDiffByIgnoredPaths(diff: string, ignoredPaths: string[]): string {
+  if (ignoredPaths.length === 0 || !diff.includes("diff --git ")) return diff;
+  const blocks = diff.split(/(?=^diff --git )/m);
+  return blocks.filter((block) => {
+    const firstLine = block.split("\n", 1)[0] ?? "";
+    const match = /^diff --git a\/(.+) b\/(.+)$/.exec(firstLine);
+    const path = match?.[2] ?? match?.[1];
+    return !path || !pathIgnored(path, ignoredPaths);
+  }).join("");
+}
+
+function filterContextForGeneration(ctx: PrContext, cfg: ClawptchaConfig): PrContext {
+  const ignoredPaths = cfg.context.ignore_paths;
+  if (ignoredPaths.length === 0) return ctx;
+  const filePatches = ctx.filePatches?.filter((file) => !pathIgnored(file.filename, ignoredPaths));
+  const files = ctx.files.filter((file) => !pathIgnored(file, ignoredPaths));
+  const changedLines = filePatches
+    ? filePatches.reduce((sum, file) => sum + file.additions + file.deletions, 0)
+    : ctx.changedLines;
+  return {
+    ...ctx,
+    diff: filterDiffByIgnoredPaths(ctx.diff, ignoredPaths),
+    files,
+    filePatches,
+    changedLines,
+  };
+}
+
 async function currentSession(
   c: Context<{ Bindings: Env }>
 ): Promise<{ id: string; gh_login: string | null } | null> {
@@ -82,18 +130,78 @@ async function currentSession(
 }
 
 export function challengeDeps(env: Env): ChallengeDeps {
+  async function getOrCreateInvestigation(
+    ctx: PrContext,
+    cfg: ClawptchaConfig,
+    provider: QuizProvider
+  ): Promise<
+    { ok: true; artifact: InvestigationArtifact; source: InvestigationSource; callsUsed: number }
+    | { ok: false; error: string; source?: InvestigationSource; mode: InvestigationArtifact["mode"]; callsUsed: number }
+  > {
+    const mode = investigationMode(ctx, cfg);
+    if (!ctx.repoFullName || !ctx.prNumber || !ctx.headSha) {
+      return { ok: false, error: "missing PR cache key", mode, callsUsed: 0 };
+    }
+    const cached = await getInvestigationByPr(env.DB, ctx.repoFullName, ctx.prNumber, ctx.headSha);
+    if (cached?.status === "ready") {
+      try {
+        const parsed = validateInvestigationArtifact(JSON.parse(cached.artifact_json), mode);
+        if (parsed.ok) return { ok: true, artifact: parsed.artifact, source: cached.source, callsUsed: 0 };
+      } catch { /* invalid cache, regenerate below */ }
+    }
+
+    const selected = chooseInvestigatorSource(env, cfg, ctx);
+    if (!selected.ok) return { ...selected, callsUsed: 0 };
+
+    const investigationAttempts = selected.source === "flue"
+      ? 1
+      : Math.max(1, Math.min(2, cfg.context.max_model_calls - 1));
+    let result;
+    if (selected.source === "flue") {
+      result = await investigatePrWithFlue(env, ctx, cfg);
+    } else {
+      result = await investigatePr(provider, ctx, cfg, investigationAttempts);
+    }
+
+    await upsertInvestigation(env.DB, {
+      id: cached?.id ?? randomToken(),
+      repo_full_name: ctx.repoFullName,
+      pr_number: ctx.prNumber,
+      head_sha: ctx.headSha,
+      source: selected.source,
+      status: result.ok ? "ready" : "failed",
+      artifact_json: result.ok ? JSON.stringify(result.artifact) : "{}",
+      error: result.ok ? null : result.error,
+    });
+    return result.ok
+      ? { ok: true, artifact: result.artifact, source: selected.source, callsUsed: investigationAttempts }
+      : { ok: false, error: result.error, source: selected.source, mode, callsUsed: investigationAttempts };
+  }
+
   return {
     now: () => new Date(),
     async fetchPrContext(ch: Challenge) {
       const api = await apiForInstallation(env, ch.installation_id);
-      const [diff, pr, files] = await Promise.all([
+      const [diff, pr, filePatches] = await Promise.all([
         api.getPrDiff(ch.repo_full_name, ch.pr_number),
         api.getPr(ch.repo_full_name, ch.pr_number),
-        api.listPrFiles(ch.repo_full_name, ch.pr_number),
+        api.listPrFileDetails(ch.repo_full_name, ch.pr_number),
       ]);
-      return { diff, title: pr.title, body: pr.body, files };
+      return {
+        diff,
+        title: pr.title,
+        body: pr.body,
+        files: filePatches.map((file) => file.filename),
+        repoFullName: ch.repo_full_name,
+        prNumber: ch.pr_number,
+        headSha: ch.head_sha,
+        installationId: ch.installation_id,
+        changedLines: pr.additions + pr.deletions,
+        filePatches,
+      };
     },
     async generateQuiz(ctx, cfg) {
+      ctx = filterContextForGeneration(ctx, cfg);
       const quizGate = getMultipleChoiceGate(cfg);
       const selected = providerFromEnv(env);
       if (!selected.ok) {
@@ -102,10 +210,38 @@ export function challengeDeps(env: Env): ChallengeDeps {
         console.error("LLM provider misconfigured:", selected.error);
         return { ok: false as const, error: selected.error };
       }
+      if (cfg.context.strategy === "adaptive" && cfg.context.max_model_calls > 1) {
+        const investigation = await getOrCreateInvestigation(ctx, cfg, selected.provider);
+        if (investigation.ok) {
+          const generationAttempts = Math.max(1, cfg.context.max_model_calls - investigation.callsUsed);
+          return generateQuizFromInvestigation(
+            selected.provider,
+            investigation.artifact,
+            ctx.title,
+            ctx.body,
+            ctx.files,
+            quizGate.questions,
+            generationAttempts
+          );
+        }
+        if (investigation.mode === "large_pr" || investigation.source === "flue") {
+          console.error("PR investigation failed; not falling back for large/Flue investigation:", investigation.error);
+          return { ok: false as const, error: investigation.error };
+        }
+        console.error("PR investigation failed; falling back to bounded direct quiz generation:", investigation.error);
+        const fallbackAttempts = Math.max(1, cfg.context.max_model_calls - investigation.callsUsed);
+        return generateQuiz(
+          selected.provider,
+          ctx.diff, ctx.title, ctx.body, ctx.files, cfg.max_context_tokens ?? cfg.context.detail_tokens,
+          quizGate.questions,
+          fallbackAttempts
+        );
+      }
       return generateQuiz(
         selected.provider,
         ctx.diff, ctx.title, ctx.body, ctx.files, cfg.max_context_tokens,
-        quizGate.questions
+        quizGate.questions,
+        cfg.context.max_model_calls
       );
     },
     async verifyTurnstile(token: string) {
@@ -307,7 +443,9 @@ app.post("/challenge/:id/answer", async (c) => {
   ));
 });
 
-app.get("/", (c) => c.text("clawptcha: a captcha for GitHub contributions"));
+app.get("/", (c) => c.html(homePage(new URL(c.req.url).origin)));
+app.get("/docs", docsAsset);
+app.get("/docs/*", docsAsset);
 
 export default {
   fetch: app.fetch,

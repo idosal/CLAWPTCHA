@@ -12,8 +12,16 @@
     // Tests auto-generate a temp config with a dummy id (see vitest.config.ts).
     { "binding": "DB", "database_name": "clawptcha" }
   ],
+  "assets": {
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
   "ai": { "binding": "AI" },
   "triggers": { "crons": ["*/15 * * * *"] },
+  // Preferred for same-account Flue deployments after `npm run flue:deploy`:
+  // "services": [
+  //   { "binding": "FLUE_INVESTIGATOR", "service": "clawptcha-flue-investigator" }
+  // ],
   "vars": {
     "APP_BASE_URL": "https://clawptcha.idosalomon.workers.dev",
     "LLM_PROVIDER": "workers-ai",

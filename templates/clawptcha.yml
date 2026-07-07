@@ -1,0 +1,67 @@
+# CLAWPTCHA default repository policy.
+# Copy to .github/clawptcha.yml when you want explicit defaults in a repo.
+#
+# Maintainer posture:
+# - AI assistance is allowed; unreviewed, unsupported PRs are not.
+# - First-time or unknown human authors need maintainer approval before taking
+#   the challenge. Prior GitHub contributors can take it directly.
+# - Draft PRs stay quiet until they are marked ready for review.
+# - Passive signals are report-only; they inform review but never auto-fail.
+
+gates:
+  - type: multiple_choice
+    questions: 4
+    pass_threshold: 3
+
+path_rules: []
+# Examples:
+# - Put auth, migrations, release, or core runtime paths under stricter gates.
+# - Use include_paths to run CLAWPTCHA only on maintained core directories.
+exemptions: []
+# Examples:
+# - author_login for named trusted contributors.
+# - author_association for GitHub relationship classes such as CONTRIBUTOR.
+# - repository_permission for role/permission names such as write, maintain,
+#   admin, or a custom GitHub repository role.
+# - linked_issue_match for trusted, planned work that matches a linked issue.
+
+signals:
+  - type: honeypot
+    report_only: true
+
+max_attempts: 3
+cooldown_minutes: 15
+draft_prs: ignore
+require_approval: first_time
+
+bot_policy:
+  default: skip
+  trusted_logins: []
+
+rechallenge:
+  on_push: never
+# Use included_paths only with include_paths. If include_paths is empty,
+# included_paths behaves like always so stale passes are not silently preserved.
+  ignore_paths: []
+
+min_changed_lines: 10
+skip_paths: ["docs/**", "*.md"]
+include_paths: []
+
+context:
+  strategy: adaptive
+  investigator: auto
+  map_tokens: 8000
+  detail_tokens: 24000
+  max_files: 12
+  max_model_calls: 3
+  ignore_paths: []
+  large_pr:
+    changed_files: 100
+    changed_lines: 5000
+
+max_context_tokens: null
+
+output:
+  comments: normal
+  labels: true

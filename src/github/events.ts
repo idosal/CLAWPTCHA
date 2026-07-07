@@ -8,13 +8,19 @@ import {
   type ClawptchaConfig,
 } from "../config";
 import { evaluateCodeHoneypotSignals, type CodeHoneypotResult } from "../policy/code-honeypot";
-import { evaluateExemption } from "../policy/exemptions";
+import {
+  applyPathRules,
+  evaluateExemption,
+  evaluateRepositoryPermissionExemption,
+  shouldRechallengeOnPush,
+} from "../policy/exemptions";
 import { evaluateLinkedIssueExemption } from "../policy/linked-issue";
 import {
   getChallengeByPr, getLatestChallengeForPr, hasPassedChallenge,
   insertChallenge, setChallengeStatus, supersedeOldChallenges,
   updateChallengeCheckRun, randomToken,
 } from "../store";
+import { hasWriteRepositoryAccess } from "./permissions";
 
 const CHECK_NAME = "clawptcha";
 const CODE_HONEYPOT_SIGNAL = "the PR introduced a configured code honeypot marker";
@@ -54,6 +60,10 @@ function challengeUrl(env: Env, challengeId: string): string {
   return `${env.APP_BASE_URL}/challenge/${challengeId}`;
 }
 
+function commentsEnabled(cfg: ClawptchaConfig): boolean {
+  return cfg.output.comments !== "quiet";
+}
+
 function commentBody(env: Env, challengeId: string, status: string, cfg: ClawptchaConfig, authorLogin: string): string {
   const url = challengeUrl(env, challengeId);
   if (status === "awaiting_approval") {
@@ -66,7 +76,7 @@ function commentBody(env: Env, challengeId: string, status: string, cfg: Clawptc
       "",
       `Once approved, the author takes a short quiz about this change: ${url}`,
       "",
-      "_Passing posts a public attestation that the author personally understands this change._",
+      "_AI assistance is allowed. Passing posts a public attestation that the author personally understands, tested, and can support this change._",
     ].join("\n");
   }
   return [
@@ -76,7 +86,7 @@ function commentBody(env: Env, challengeId: string, status: string, cfg: Clawptc
     "",
     `➡️ **[Start the challenge](${url})**`,
     "",
-    "_Passing posts a public attestation that you personally understand this change. The quiz is generated from the diff; answers are graded automatically._",
+    "_AI assistance is allowed. Passing posts a public attestation that you personally understand, tested, and can support this change. The quiz is generated from the diff; answers are graded automatically._",
   ].join("\n");
 }
 
@@ -84,7 +94,7 @@ export async function handlePullRequestEvent(
   env: Env, api: GitHubApi, payload: any
 ): Promise<void> {
   const action = payload.action as string;
-  if (!["opened", "synchronize", "reopened"].includes(action)) return;
+  if (!["opened", "synchronize", "reopened", "ready_for_review", "converted_to_draft"].includes(action)) return;
 
   const repo = payload.repository.full_name as string;
   const installationId = payload.installation.id as number;
@@ -92,20 +102,40 @@ export async function handlePullRequestEvent(
   const headSha = payload.pull_request.head.sha as string;
   const baseSha = payload.pull_request.base.sha as string;
 
-  // Idempotency: webhook redeliveries for a known (pr, sha) are no-ops.
-  if (await getChallengeByPr(env.DB, repo, prNumber, headSha)) return;
+  const existingChallenge = await getChallengeByPr(env.DB, repo, prNumber, headSha);
+  // Idempotency: webhook redeliveries for a known (pr, sha) are no-ops, except
+  // draft conversion may intentionally retire an open challenge for the same SHA.
+  if (existingChallenge && action !== "converted_to_draft") return;
 
   const pr = await api.getPr(repo, prNumber);
   // Config comes from the merge target, never the PR branch — a PR must not be able to weaken its own gate.
   const configYaml = await api.getFileContent(repo, ".github/clawptcha.yml", baseSha);
-  const cfg = parseConfig(configYaml);
+  let cfg = parseConfig(configYaml);
 
   // A new head SHA obsoletes any open challenge for this PR, regardless of
   // which branch below handles it — stale challenges must never stay takeable.
   await supersedeOldChallenges(env.DB, repo, prNumber, headSha);
 
   const changedFiles = await api.listPrFiles(repo, prNumber);
+  cfg = applyPathRules(cfg, changedFiles);
   const codeHoneypot = await evaluatePrCodeHoneypot(api, repo, prNumber, cfg);
+
+  if (pr.draft && cfg.draft_prs !== "challenge") {
+    if (existingChallenge && ["awaiting_approval", "ready"].includes(existingChallenge.status)) {
+      await setChallengeStatus(env.DB, existingChallenge.id, "superseded");
+    }
+    if (cfg.draft_prs === "neutral") {
+      await api.createCheckRun(repo, {
+        name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "neutral",
+        output: {
+          title: "Draft PR",
+          summary: withCodeHoneypotSummary("No challenge required while this pull request is a draft.", codeHoneypot),
+        },
+      });
+    }
+    return;
+  }
+
   const exemption = evaluateExemption(
     {
       authorLogin: pr.author_login,
@@ -123,6 +153,25 @@ export async function handlePullRequestEvent(
       output: {
         title: "Exempt",
         summary: withCodeHoneypotSummary(`No challenge required: ${exemption.reason}.`, codeHoneypot),
+      },
+    });
+    return;
+  }
+
+  const repositoryPermissionExemption = await evaluateRepositoryPermissionExemption(
+    { repo, authorLogin: pr.author_login },
+    cfg,
+    { getUserPermission: (repoName, username) => api.getUserPermission(repoName, username) }
+  );
+  if (repositoryPermissionExemption.exempt) {
+    await api.createCheckRun(repo, {
+      name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
+      output: {
+        title: "Exempt",
+        summary: withCodeHoneypotSummary(
+          `No challenge required: ${repositoryPermissionExemption.reason}.`,
+          codeHoneypot
+        ),
       },
     });
     return;
@@ -158,8 +207,8 @@ export async function handlePullRequestEvent(
     }
   }
 
-  // synchronize with an existing pass and rechallenge_on_push=false → keep the pass.
-  if (action === "synchronize" && !cfg.rechallenge_on_push) {
+  // synchronize with an existing pass and rechallenge policy says no new challenge → keep the pass.
+  if (action === "synchronize" && !shouldRechallengeOnPush(cfg, changedFiles)) {
     if (await hasPassedChallenge(env.DB, repo, prNumber)) {
       await api.createCheckRun(repo, {
         name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
@@ -217,7 +266,9 @@ export async function handlePullRequestEvent(
     throw e;
   }
 
-  await api.upsertPrComment(repo, prNumber, commentBody(env, challengeId, status, cfg, pr.author_login));
+  if (commentsEnabled(cfg)) {
+    await api.upsertPrComment(repo, prNumber, commentBody(env, challengeId, status, cfg, pr.author_login));
+  }
 }
 
 export async function handleIssueCommentEvent(
@@ -233,7 +284,7 @@ export async function handleIssueCommentEvent(
   const commenter = payload.comment.user.login as string;
 
   const permission = await api.getUserPermission(repo, commenter);
-  if (!["admin", "write"].includes(permission)) return;
+  if (!hasWriteRepositoryAccess(permission)) return;
 
   const challenge = await getLatestChallengeForPr(env.DB, repo, prNumber);
   if (!challenge || challenge.status !== "awaiting_approval") return;
@@ -248,5 +299,7 @@ export async function handleIssueCommentEvent(
       },
     });
   }
-  await api.upsertPrComment(repo, prNumber, commentBody(env, challenge.id, "ready", storedCfg, challenge.author_login));
+  if (commentsEnabled(storedCfg)) {
+    await api.upsertPrComment(repo, prNumber, commentBody(env, challenge.id, "ready", storedCfg, challenge.author_login));
+  }
 }

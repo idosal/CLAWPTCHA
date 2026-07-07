@@ -24,6 +24,8 @@ export async function onChallengeResolved(
 
   const report = buildRiskReport(r.telemetry);
   const riskMd = renderRiskReportMarkdown(report, r.telemetry);
+  const commentsEnabled = r.cfg.output.comments !== "quiet";
+  const detailedComments = r.cfg.output.comments === "detailed";
 
   switch (r.outcome) {
     case "passed": {
@@ -34,7 +36,7 @@ export async function onChallengeResolved(
           summary: `Score ${r.score}/${r.total}.\n\n${riskMd}`,
         },
       });
-      if (report.automationLikely) {
+      if (report.automationLikely && r.cfg.output.labels) {
         // Comment edits don't notify anyone; the label is what makes a flagged
         // pass visible from the PR list. Best-effort: a labeling failure (e.g.
         // missing permission) must not block the attestation below.
@@ -43,15 +45,18 @@ export async function onChallengeResolved(
           await api.addLabels(repo, pr, [FLAGGED_LABEL]);
         } catch { /* attestation still posts; check title carries the flag */ }
       }
-      await api.upsertPrComment(repo, pr, [
-        "## 🦞 Clawptcha — passed ✅",
-        "",
-        `@${r.challenge.author_login} certified under challenge that they personally understand this change (score ${r.score}/${r.total}).`,
-        "",
-        report.automationLikely
-          ? `> ⚠️ **Worth a second look before merging:** this quiz was completed in a way that looks scripted — ${report.signals.join("; ")}.`
-          : "_Behavioral risk report attached to the check run for maintainers._",
-      ].join("\n"));
+      if (commentsEnabled) {
+        await api.upsertPrComment(repo, pr, [
+          "## 🦞 Clawptcha — passed ✅",
+          "",
+          `@${r.challenge.author_login} certified under challenge that they personally understand this change (score ${r.score}/${r.total}).`,
+          "",
+          report.automationLikely
+            ? `> ⚠️ **Worth a second look before merging:** this quiz was completed in a way that looks scripted — ${report.signals.join("; ")}.`
+            : "_Behavioral risk report attached to the check run for maintainers._",
+          ...(detailedComments ? ["", riskMd] : []),
+        ].join("\n"));
+      }
       break;
     }
     case "failed_retry": {
@@ -75,13 +80,16 @@ export async function onChallengeResolved(
           summary: `Score ${r.score}/${r.total}. Max attempts reached.\n\n${riskMd}`,
         },
       });
-      await api.upsertPrComment(repo, pr, [
-        "## 🦞 Clawptcha — challenge failed ❌",
-        "",
-        `@${r.challenge.author_login} did not pass the comprehension check after ${r.cfg.max_attempts} attempts.`,
-        "",
-        "Maintainers: please review this PR manually before merging.",
-      ].join("\n"));
+      if (commentsEnabled) {
+        await api.upsertPrComment(repo, pr, [
+          "## 🦞 Clawptcha — challenge failed ❌",
+          "",
+          `@${r.challenge.author_login} did not pass the comprehension check after ${r.cfg.max_attempts} attempts.`,
+          "",
+          "Maintainers: please review this PR manually before merging.",
+          ...(detailedComments ? ["", riskMd] : []),
+        ].join("\n"));
+      }
       break;
     }
     case "neutral": {

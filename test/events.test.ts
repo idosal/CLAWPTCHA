@@ -25,7 +25,7 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
 const pr: PrDetails = {
   number: 7, head_sha: "abc123", author_login: "contributor",
   author_type: "User", author_association: "FIRST_TIME_CONTRIBUTOR",
-  additions: 100, deletions: 30, title: "Add feature", body: "Does a thing",
+  draft: false, additions: 100, deletions: 30, title: "Add feature", body: "Does a thing",
 };
 
 const codeHoneypotYaml = [
@@ -93,12 +93,97 @@ describe("handlePullRequestEvent", () => {
     expect(ch?.status).toBe("ready");
   });
 
+  it("neutralizes draft PRs when configured", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => "draft_prs: neutral\n"),
+      getPr: vi.fn(async () => ({ ...pr, draft: true })),
+    });
+    const n = uniq + 15;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "neutral",
+      output: expect.objectContaining({ title: "Draft PR" }),
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("ignores draft PRs by default", async () => {
+    const api = stubApi({
+      getPr: vi.fn(async () => ({ ...pr, draft: true })),
+    });
+    const n = uniq + 20;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+    expect(api.createCheckRun).not.toHaveBeenCalled();
+    expect(api.upsertPrComment).not.toHaveBeenCalled();
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("applies path rule overrides before challenge creation", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "path_rules:",
+        "  - paths: ['src/core/**']",
+        "    gates:",
+        "      - type: multiple_choice",
+        "        questions: 6",
+        "        pass_threshold: 5",
+        "    require_approval: always",
+        "",
+      ].join("\n")),
+      getPr: vi.fn(async () => ({ ...pr, author_association: "CONTRIBUTOR" })),
+      listPrFiles: vi.fn(async () => ["src/core/service.ts"]),
+    });
+    const n = uniq + 16;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+
+    const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    expect(ch?.status).toBe("awaiting_approval");
+    expect(JSON.parse(ch!.config_json).gates).toEqual([{
+      type: "multiple_choice",
+      questions: 6,
+      pass_threshold: 5,
+    }]);
+  });
+
+  it("does not post a challenge comment when output comments are quiet", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "output:",
+        "  comments: quiet",
+        "",
+      ].join("\n")),
+    });
+    const n = uniq + 17;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).not.toBeNull();
+    expect(api.upsertPrComment).not.toHaveBeenCalled();
+  });
+
   it("exempts docs-only PRs with a success check and no challenge row", async () => {
     const api = stubApi({ listPrFiles: vi.fn(async () => ["docs/x.md", "README.md"]) });
     const n = uniq + 3;
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
     expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
       status: "completed", conclusion: "success",
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("exempts PRs that do not touch configured include paths", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => "include_paths: ['src/core/**']\n"),
+      listPrFiles: vi.fn(async () => ["examples/demo.txt"]),
+    });
+    const n = uniq + 14;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({
+        title: "Exempt",
+        summary: expect.stringContaining("no changed files match include_paths"),
+      }),
     }));
     expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
   });
@@ -164,6 +249,55 @@ describe("handlePullRequestEvent", () => {
     expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
   });
 
+  it("exempts PR authors with a configured repository permission", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "exemptions:",
+        "  - type: repository_permission",
+        "    permissions: [write]",
+        "",
+      ].join("\n")),
+      getUserPermission: vi.fn(async () => "write"),
+    });
+    const n = uniq + 13;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+
+    expect(api.getUserPermission).toHaveBeenCalledWith("o/r", "contributor");
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({
+        title: "Exempt",
+        summary: expect.stringContaining("trusted repository permission (write)"),
+      }),
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("exempts PR authors with a configured repository role name", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "exemptions:",
+        "  - type: repository_permission",
+        "    permissions: [maintain]",
+        "",
+      ].join("\n")),
+      getUserPermission: vi.fn(async () => ({ permission: "write", role_name: "maintain" })),
+    });
+    const n = uniq + 21;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({
+        title: "Exempt",
+        summary: expect.stringContaining("trusted repository permission (maintain)"),
+      }),
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
   it("is idempotent for the same head sha (webhook redelivery)", async () => {
     const api = stubApi();
     const n = uniq + 4;
@@ -196,6 +330,70 @@ describe("handlePullRequestEvent", () => {
         summary: expect.stringContaining("configured code honeypot marker"),
       }),
     }));
+  });
+
+  it("keeps a prior pass when structured rechallenge included_paths does not match", async () => {
+    const yaml = [
+      "include_paths: ['src/core/**']",
+      "rechallenge:",
+      "  on_push: included_paths",
+      "",
+    ].join("\n");
+    const api = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      listPrFiles: vi.fn(async () => ["src/core/service.ts"]),
+    });
+    const n = uniq + 18;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
+    await testEnv.DB.prepare(
+      "UPDATE challenges SET status='passed' WHERE repo_full_name='o/r' AND pr_number=? AND head_sha='sha1'"
+    ).bind(n).run();
+
+    const p2 = payloadFor(n, "sha2");
+    p2.action = "synchronize";
+    const api2 = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })),
+      listPrFiles: vi.fn(async () => ["docs/guide.md"]),
+    });
+    await handlePullRequestEvent(testEnv, api2, p2);
+    expect(api2.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      head_sha: "sha2",
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({
+        title: "Exempt",
+        summary: expect.stringContaining("no changed files match include_paths"),
+      }),
+    }));
+  });
+
+  it("re-challenges a prior pass when structured rechallenge included_paths matches", async () => {
+    const yaml = [
+      "include_paths: ['src/core/**']",
+      "rechallenge:",
+      "  on_push: included_paths",
+      "",
+    ].join("\n");
+    const api = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      listPrFiles: vi.fn(async () => ["src/core/service.ts"]),
+    });
+    const n = uniq + 19;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
+    await testEnv.DB.prepare(
+      "UPDATE challenges SET status='passed' WHERE repo_full_name='o/r' AND pr_number=? AND head_sha='sha1'"
+    ).bind(n).run();
+
+    const p2 = payloadFor(n, "sha2");
+    p2.action = "synchronize";
+    const api2 = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })),
+      listPrFiles: vi.fn(async () => ["src/core/service.ts"]),
+    });
+    await handlePullRequestEvent(testEnv, api2, p2);
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "sha2")).not.toBeNull();
   });
 
   it("reads clawptcha.yml from the base SHA, not the PR head", async () => {
@@ -248,7 +446,7 @@ describe("handleIssueCommentEvent", () => {
     const api = stubApi();
     const n = uniq + 6;
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
-    const approver = stubApi({ getUserPermission: vi.fn(async () => "write") });
+    const approver = stubApi({ getUserPermission: vi.fn(async () => ({ permission: "write", role_name: "maintain" })) });
     await handleIssueCommentEvent(testEnv, approver, {
       action: "created",
       installation: { id: 1 },

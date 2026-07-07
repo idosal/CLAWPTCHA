@@ -1,4 +1,4 @@
-import type { Challenge, ChallengeStatus } from "./types";
+import type { Challenge, ChallengeStatus, PrInvestigation } from "./types";
 
 export function randomToken(bytes = 24): string {
   const buf = new Uint8Array(bytes);
@@ -86,5 +86,47 @@ export async function supersedeOldChallenges(
          AND status IN ('awaiting_approval','ready')`
     )
     .bind(repo, prNumber, keepHeadSha)
+    .run();
+}
+
+export async function getInvestigationByPr(
+  db: D1Database, repo: string, prNumber: number, headSha: string
+): Promise<PrInvestigation | null> {
+  return db
+    .prepare(
+      `SELECT * FROM pr_investigations
+       WHERE repo_full_name=? AND pr_number=? AND head_sha=?
+       LIMIT 1`
+    )
+    .bind(repo, prNumber, headSha)
+    .first<PrInvestigation>();
+}
+
+export async function upsertInvestigation(
+  db: D1Database,
+  investigation: Omit<PrInvestigation, "created_at" | "updated_at">
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO pr_investigations
+       (id, repo_full_name, pr_number, head_sha, source, status, artifact_json, error)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(repo_full_name, pr_number, head_sha) DO UPDATE SET
+         source=excluded.source,
+         status=excluded.status,
+         artifact_json=excluded.artifact_json,
+         error=excluded.error,
+         updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+    )
+    .bind(
+      investigation.id,
+      investigation.repo_full_name,
+      investigation.pr_number,
+      investigation.head_sha,
+      investigation.source,
+      investigation.status,
+      investigation.artifact_json,
+      investigation.error
+    )
     .run();
 }
