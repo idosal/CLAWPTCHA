@@ -3,14 +3,16 @@ title: Why use CLAWPTCHA
 description: When a repository should ask pull request authors for proof of understanding, and what CLAWPTCHA deliberately does not claim to solve.
 ---
 
-CLAWPTCHA exists for a specific maintainer problem: more pull requests can now
-be produced cheaply, but review attention is still scarce. The product gives
-maintainers a policy layer between "trust every contributor" and "close every
-unknown PR".
+CLAWPTCHA is a free open-source project for a specific maintainer problem:
+more pull requests can now be produced cheaply, but review attention is still
+scarce. The product gives maintainers a policy layer between "trust every
+contributor" and "close every unknown PR".
 
 It does not try to prove that a human wrote the code. It asks the PR author to
 make an on-record claim that they understand the change, while giving
-maintainers a risk report about the way that claim was made.
+maintainers a risk report about the way that claim was made. It is designed to
+complement code review, CI, tests, branch protection, and existing maintainer
+workflows, not replace them.
 
 ## Use it when
 
@@ -20,6 +22,10 @@ maintainers a risk report about the way that claim was made.
   behavior changes, affected surfaces, and blast radius.
 - Maintainers want planned work, trusted issue context, and known authors to
   move through with less friction.
+- Maintainers want a middle ground for trusted teams, repo role holders, and
+  contributors who already have a body of merged work.
+- The project allows AI-assisted work but wants PR authors to explicitly accept
+  responsibility for understanding, testing, and follow-up.
 - Sensitive paths such as auth, migrations, runtime, CI, infrastructure, or
   generated-release code need stronger policy than docs or examples.
 - You want passive evidence such as honeypot fields or code canaries to appear
@@ -42,8 +48,9 @@ report neutral rather than convert its own outage into a merge blocker.
 CLAWPTCHA moves common review questions earlier:
 
 - Is this PR already covered by trusted context?
-- Is the author a maintainer, known contributor, trusted bot, or trusted repo
-  permission holder?
+- Is the author a maintainer, known contributor, trusted bot, trusted team
+  member, repo role holder, or contributor with enough prior merged PRs?
+- Did the PR body include the repository's required accountability fields?
 - Did the PR only touch paths the repository has chosen to skip?
 - Did the author pass a challenge about the change itself?
 - Did passive signals suggest that the pass deserves a second look?

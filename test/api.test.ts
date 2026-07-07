@@ -114,6 +114,28 @@ describe("GitHubApi", () => {
     });
   });
 
+  it("checks GitHub team membership", async () => {
+    const f = mockFetch(200, { state: "active", role: "maintainer" });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    expect(await api.getTeamMembership("octo-org", "maintainers", "octocat")).toEqual({
+      state: "active",
+      role: "maintainer",
+    });
+    expect(String(f.mock.calls[0][0])).toBe(
+      "https://api.github.com/orgs/octo-org/teams/maintainers/memberships/octocat"
+    );
+  });
+
+  it("counts merged PRs by author through search", async () => {
+    const f = mockFetch(200, { total_count: 4, items: [] });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    expect(await api.countMergedPullRequestsByAuthor("o/r", "octocat")).toBe(4);
+    const url = new URL(String(f.mock.calls[0][0]));
+    expect(url.pathname).toBe("/search/issues");
+    expect(url.searchParams.get("q")).toBe("repo:o/r is:pr is:merged author:octocat");
+    expect(url.searchParams.get("per_page")).toBe("1");
+  });
+
   it("upserts the clawptcha PR comment (updates when marker found)", async () => {
     const existing = [{ id: 9, body: "<!-- clawptcha --> old" }];
     const f = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {

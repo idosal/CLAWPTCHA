@@ -54,6 +54,11 @@ This gives first-time contributors a maintainer checkpoint before the quiz,
 keeps draft PRs quiet until they are ready for review, skips docs-only work,
 and records the default form honeypot signal as review evidence.
 
+Also copy or adapt `templates/contributing-policy.md` into `CONTRIBUTING.md`
+and `templates/pull_request_template.md` into the repository PR template. It
+tells contributors the same policy CLAWPTCHA enforces: AI assistance is
+allowed, but the submitter must understand, test, explain, and support the PR.
+
 ## 3. Verify the first scenarios
 
 Before tightening policy, open or replay a few predictable PRs:

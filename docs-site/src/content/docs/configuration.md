@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: The current CLAWPTCHA policy surface for gates, exemptions, passive signals, path rules, investigation, retries, and output.
+description: The current CLAWPTCHA policy surface for accountability, gates, exemptions, passive signals, path rules, investigation, retries, and output.
 ---
 
 Store repository policy in `.github/clawptcha.yml` on the default branch or
@@ -12,7 +12,9 @@ breaking the whole policy file.
 
 Copy `templates/clawptcha.yml` when a repository wants the built-in defaults
 committed explicitly. The default template uses `draft_prs: ignore`, so draft
-PRs stay quiet until they are marked ready for review.
+PRs stay quiet until they are marked ready for review. Copy
+`templates/contributing-policy.md` when the repository also wants maintainer
+language for AI-assisted or otherwise low-accountability PRs.
 
 ## Full example
 
@@ -42,6 +44,10 @@ exemptions:
     associations: [CONTRIBUTOR]
   - type: repository_permission
     permissions: [write, maintain, admin]
+  - type: github_team
+    teams: [maintainers, octo-org/security]
+  - type: prior_merged_prs
+    min_count: 3
   - type: linked_issue_match
     require_same_repo: true
     require_trusted_signal: true
@@ -61,6 +67,10 @@ require_approval: first_time
 max_attempts: 3
 cooldown_minutes: 15
 draft_prs: ignore
+
+accountability:
+  require_pr_acknowledgement: false
+  require_ai_disclosure: false
 
 bot_policy:
   default: skip
@@ -99,8 +109,8 @@ output:
 | --- | --- | --- |
 | Author-facing proof | `gates` | The challenge type, question count, and passing threshold. |
 | Scope | `skip_paths`, `include_paths`, `min_changed_lines`, `path_rules` | Which PRs should skip, enter, or receive stricter policy. |
-| Trust | `exemptions`, `bot_policy` | Which authors, permissions, and planned issues can avoid a challenge. |
-| Approval and retry | `require_approval`, `max_attempts`, `cooldown_minutes`, `draft_prs`, `rechallenge` | Human approval, drafts, retry limits, cooldown, and new-commit behavior. |
+| Trust | `exemptions`, `bot_policy` | Which authors, teams, repository roles, contributor history, and planned issues can avoid a challenge. |
+| Approval and retry | `require_approval`, `accountability`, `max_attempts`, `cooldown_minutes`, `draft_prs`, `rechallenge` | Human approval, required PR-body accountability fields, drafts, retry limits, cooldown, and new-commit behavior. |
 | Passive evidence | `signals`, `output.labels` | Honeypot fields, code canaries, and flagged-pass labels. |
 | Investigation | `context`, `max_context_tokens` | How PR evidence is condensed before quiz generation. |
 | Reporting | `output.comments`, `output.labels` | PR comment volume and best-effort labels. |
@@ -182,12 +192,42 @@ exemptions:
     associations: [CONTRIBUTOR]
   - type: repository_permission
     permissions: [write, maintain, admin]
+  - type: github_team
+    teams: [maintainers, octo-org/security]
+  - type: prior_merged_prs
+    min_count: 3
 ```
 
 Owners, members, and collaborators are trusted by default. `author_login` and
 `author_association` add repository-specific trust. `repository_permission`
-reuses GitHub's collaborator permission API and falls back to the gate if the
-permission cannot be resolved.
+reuses GitHub's collaborator permission API, matching both `role_name` values
+such as `maintain`, `admin`, and custom repository roles, and legacy
+`permission` values such as `write` or `read`. If GitHub cannot resolve access,
+CLAWPTCHA falls back to the gate.
+
+`github_team` trusts active members of named GitHub teams. Bare team slugs use
+the repository owner; `org/team-slug` can point at a specific organization.
+This requires the GitHub App to have Members read permission. `roles` is
+optional and defaults to both team members and team maintainers.
+
+```yaml
+exemptions:
+  - type: github_team
+    teams: [maintainers, octo-org/security]
+    roles: [member, maintainer]
+```
+
+`prior_merged_prs` trusts authors after enough merged PRs in the same
+repository:
+
+```yaml
+exemptions:
+  - type: prior_merged_prs
+    min_count: 3
+```
+
+Both exemptions fail closed: when GitHub cannot resolve membership or search
+history, the PR falls through to the normal gate.
 
 Bots are controlled separately:
 
@@ -201,6 +241,29 @@ bot_policy:
 Legacy `skip_bots` maps into this setting when `bot_policy` is omitted.
 Legacy `skip_authors` still works as an author allowlist, but new configs
 should prefer `exemptions: [{ type: author_login, ... }]`.
+
+## Accountability preflight
+
+`accountability` can require the PR body to include explicit responsibility
+fields before CLAWPTCHA creates a quiz.
+
+```yaml
+accountability:
+  require_pr_acknowledgement: true
+  require_ai_disclosure: true
+```
+
+With both options enabled, the PR body must include a checked acknowledgement
+and an AI assistance line:
+
+```md
+- [x] I understand, tested, and can support this change.
+AI assistance: yes
+```
+
+Use `yes`, `no`, `n/a`, or `none` for the disclosure value. Start from
+`templates/pull_request_template.md` so contributors see the required fields
+before they open the PR.
 
 ## Linked issue exemptions
 
@@ -261,9 +324,11 @@ rechallenge:
   ignore_paths: ["docs/**", "*.md"]
 ```
 
-`on_push` accepts `never`, `always`, or `included_paths`. `ignore_paths` keeps
-low-risk pushes from invalidating a prior pass. Legacy `rechallenge_on_push:
-true` maps to `on_push: always` when `rechallenge` is omitted.
+`on_push` accepts `never`, `always`, or `included_paths`. `included_paths` uses
+the effective `include_paths`; if that list is empty, it behaves like `always`
+so stale passes are not silently preserved. `ignore_paths` keeps low-risk pushes
+from invalidating a prior pass. Legacy `rechallenge_on_push: true` maps to
+`on_push: always` when `rechallenge` is omitted.
 
 `output` controls PR noise and labels:
 
@@ -322,6 +387,7 @@ older truncation path.
 | `max_attempts` | `3` |
 | `cooldown_minutes` | `15` |
 | `draft_prs` | `ignore` |
+| `accountability` | `{ require_pr_acknowledgement: false, require_ai_disclosure: false }` |
 | `bot_policy` | `{ default: "skip", trusted_logins: [] }` |
 | `rechallenge` | `{ on_push: "never", ignore_paths: [] }` |
 | `min_changed_lines` | `10` |

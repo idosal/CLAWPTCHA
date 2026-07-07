@@ -22,6 +22,7 @@ export function buildManifest(i: ManifestInput) {
       pull_requests: "write",
       contents: "read",
       metadata: "read",
+      members: "read",
     },
     default_events: ["pull_request", "issue_comment", "installation"],
   };

@@ -36,7 +36,7 @@ export async function createAppJwt(appId: string, pkcs8Pem: string, now: Date): 
 export type InstallationTokenPermission = "read" | "write";
 
 export interface InstallationTokenOptions {
-  permissions?: Partial<Record<"contents" | "pull_requests" | "metadata", InstallationTokenPermission>>;
+  permissions?: Partial<Record<"contents" | "pull_requests" | "metadata" | "members", InstallationTokenPermission>>;
   repositoryIds?: number[];
 }
 

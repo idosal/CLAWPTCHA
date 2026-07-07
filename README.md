@@ -11,8 +11,9 @@ report.
 1. Install the GitHub App on a repo and add `.github/clawptcha.yml` if the
    defaults are not your policy.
 2. When a PR opens, CLAWPTCHA resolves the repo's governance preferences:
-   maintainer/bot/path/size exemptions, trusted linked-issue exemptions, passive
-   signals, and any configured gates.
+   draft handling, optional PR-body accountability fields, maintainer/bot/path/
+   size exemptions, team and repository-role trust, prior contributor history,
+   trusted linked-issue exemptions, passive signals, and any configured gates.
 3. If a challenge is required, the PR author opens the link, signs in with
    GitHub, passes Turnstile, and completes the configured gate. CLAWPTCHA
    first builds a cached PR investigation from the file map and selected patch
@@ -37,9 +38,10 @@ Copy [templates/clawptcha.yml](templates/clawptcha.yml) when a repository wants
 the built-in defaults committed explicitly. The default template uses
 `draft_prs: ignore`, so draft PRs stay quiet until they are marked ready for
 review. Copy [templates/contributing-policy.md](templates/contributing-policy.md)
-when maintainers want a matching contribution-policy snippet: AI assistance is
-allowed, but the submitter is accountable for understanding, testing, and
-supporting the PR.
+and [templates/pull_request_template.md](templates/pull_request_template.md)
+when maintainers want matching human-facing policy: AI assistance is allowed,
+but the submitter is accountable for understanding, testing, and supporting the
+PR.
 
 ```yaml
 gates:
@@ -70,6 +72,15 @@ exemptions:
   - type: repository_permission
     permissions: [write, maintain, admin]
 
+  # Optional. Trust members of GitHub teams. Bare team slugs use the repo owner.
+  # This needs GitHub App "Members: read" organization permission.
+  - type: github_team
+    teams: [maintainers, octo-org/security]
+
+  # Optional. Trust authors after enough merged PRs in this repository.
+  - type: prior_merged_prs
+    min_count: 3
+
   # Optional. Reuses ordinary GitHub issue workflow; no CLAWPTCHA-specific
   # label is required when the linked issue already has a trusted signal.
   - type: linked_issue_match
@@ -89,6 +100,9 @@ max_attempts: 3
 cooldown_minutes: 15
 draft_prs: ignore          # challenge | neutral | ignore
 require_approval: first_time  # first_time | always | never
+accountability:
+  require_pr_acknowledgement: false
+  require_ai_disclosure: false
 bot_policy:
   default: skip            # skip | challenge
   trusted_logins: ["dependabot[bot]", "renovate[bot]"]
@@ -119,13 +133,14 @@ output:
 |---|---|---|
 | `gates` | `[{ type: "multiple_choice", questions: 4, pass_threshold: 3 }]` | Author-facing challenge stages. Today CLAWPTCHA supports `multiple_choice`, with `questions` as an integer 1–10 and `pass_threshold` capped at the question count. |
 | `path_rules` | `[]` | First matching path-specific policy override. Supports `paths`, `gates`, `require_approval`, `max_attempts`, `cooldown_minutes`, `min_changed_lines`, `skip_paths`, and `include_paths`. |
-| `exemptions` | `[]` | Structured reasons no challenge is required. Today CLAWPTCHA supports `author_login`, `author_association`, `repository_permission`, and `linked_issue_match`. |
+| `exemptions` | `[]` | Structured reasons no challenge is required. Today CLAWPTCHA supports `author_login`, `author_association`, `repository_permission`, `github_team`, `prior_merged_prs`, and `linked_issue_match`. |
 | `signals` | `[{ type: "honeypot", report_only: true }]` | Passive risk signals that appear in the maintainer report. Today CLAWPTCHA supports `honeypot`, an off-screen decoy form field that can flag broad automated form filling, and `code_honeypot`, maintainer-authored literal canary patterns scanned only in added diff lines. Set `signals: []` to disable passive honeypot collection. |
 | `pass_threshold` | `3` | Legacy shortcut for the default multiple-choice gate's threshold when `gates` is omitted. New configs should prefer `gates[0].pass_threshold`. |
 | `max_attempts` | `3` | Integer, 1–10. Total quiz attempts allowed per challenge before the check becomes `failed_final` and stays failed for maintainers to review manually. |
 | `cooldown_minutes` | `15` | Integer, ≥ 0. Minutes an author must wait after a failed (non-final) attempt before starting a retry. |
 | `draft_prs` | `"ignore"` | Enum: `challenge` \| `neutral` \| `ignore`. Controls whether draft PRs get the normal challenge, a neutral check, or no check. The default keeps drafts quiet until `ready_for_review`. |
 | `require_approval` | `"first_time"` | Enum: `first_time` \| `always` \| `never`. `first_time` requires maintainer approval (`/clawptcha approve` PR comment) only when the author's GitHub `author_association` is `FIRST_TIME_CONTRIBUTOR`, `FIRST_TIMER`, or `NONE`; `always` requires approval for every PR; `never` skips the approval gate entirely. An invalid value falls back to `first_time`. |
+| `accountability` | `{ require_pr_acknowledgement: false, require_ai_disclosure: false }` | Optional PR-body preflight. When enabled, CLAWPTCHA fails the check before creating a quiz unless the PR body has the configured acknowledgement and/or AI assistance disclosure line. |
 | `bot_policy` | `{ default: "skip", trusted_logins: [] }` | Structured bot handling. `default: challenge` lets repos challenge bots except named trusted bot logins. Legacy `skip_bots` maps into this when `bot_policy` is omitted. |
 | `rechallenge` | `{ on_push: "never", ignore_paths: [] }` | Structured push policy. `on_push` can be `never`, `always`, or `included_paths`; `ignore_paths` keeps low-risk pushes from invalidating a prior pass. `included_paths` uses the effective `include_paths`; when that list is empty it behaves like `always` so stale passes are not silently preserved. |
 | `min_changed_lines` | `10` | Diffs with fewer than this many changed lines (additions + deletions) are exempt ("diff below min_changed_lines"). |
@@ -183,14 +198,68 @@ configured `gates` rather than treating the author as trusted.
 Legacy configs can still use `skip_bots`; when `bot_policy` is omitted it maps
 to `bot_policy.default`. New configs should prefer `bot_policy`.
 
+### Team and contributor-history exemptions
+
+`github_team` lets organization repos trust named GitHub teams. Bare team slugs
+use the repository owner (`maintainers` in `octo-org/repo` means
+`octo-org/maintainers`); `org/team-slug` can point at a specific organization.
+The membership must be active, and GitHub must let the app read team membership.
+
+```yaml
+exemptions:
+  - type: github_team
+    teams: [maintainers, octo-org/security]
+    roles: [member, maintainer] # optional; defaults to both
+```
+
+This requires the GitHub App to have **Members: Read-only** organization
+permission. If membership cannot be resolved, CLAWPTCHA falls back to the gate.
+
+`prior_merged_prs` trusts contributors after they have enough merged pull
+requests in the same repository. This is useful for maintainers who want a
+middle tier between first-timers and core maintainers.
+
+```yaml
+exemptions:
+  - type: prior_merged_prs
+    min_count: 3
+```
+
+CLAWPTCHA counts merged PRs with GitHub issue search. If GitHub search is
+unavailable, the exemption does not match.
+
 ### Contributor accountability policy
 
 CLAWPTCHA is not an AI detector. It is an accountability gate: the author may
 use AI, but passing records that they personally understand, tested, and can
 support the PR. Repositories dealing with low-effort or unsupported PRs should
-also document that policy for humans, not only enforce it in YAML. Start from
-[templates/contributing-policy.md](templates/contributing-policy.md) and adapt
-it to the project's review norms.
+also document that policy for humans, not only enforce it in YAML.
+
+Start from [templates/contributing-policy.md](templates/contributing-policy.md)
+and [templates/pull_request_template.md](templates/pull_request_template.md),
+then opt into PR-body enforcement when the repository wants it:
+
+```yaml
+accountability:
+  require_pr_acknowledgement: true
+  require_ai_disclosure: true
+```
+
+With both fields enabled, the PR body must include:
+
+```md
+- [x] I understand, tested, and can support this change.
+AI assistance: yes
+```
+
+Use `yes`, `no`, `n/a`, or `none` for the AI assistance line.
+
+### GitHub-native PR limits
+
+For high-volume repositories, pair CLAWPTCHA with GitHub's own contribution
+controls: PR creation limits, trusted bypass lists, and temporary restrictions
+on who can open PRs. CLAWPTCHA should provide accountability and evidence for
+PRs that reach review; GitHub-native controls should handle volume throttling.
 
 ### Linked issue exemptions
 
@@ -363,7 +432,9 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
    - Webhook URL: `https://<your-worker>/webhook`; webhook secret = the value
      you'll put in `GITHUB_WEBHOOK_SECRET`.
    - Permissions: **Checks: Read & write**, **Pull requests: Read & write**,
-     **Contents: Read-only**, **Metadata: Read-only**.
+     **Contents: Read-only**, **Metadata: Read-only**, and **Members:
+     Read-only**. Members read is used by `github_team` exemptions and is
+     harmless if the repository does not configure them.
    - Subscribe to events: **Pull request**, **Issue comment**, **Installation**.
    - Under "Identifying and authorizing users", set the OAuth callback URL to
      `https://<your-worker>/oauth/callback` (this is used to identify the PR
@@ -443,18 +514,29 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
 
 ## Data custody & security
 
+- The managed service is intended for installed public open-source
+  repositories. Self-deployed operators control their own storage, model
+  provider, and retention posture.
 - The service **never holds maintainers' secrets**. Repo access is entirely
   through the GitHub App installation model: the only long-lived credential
   is the operator's own App private key. Per-repo access uses short-lived
   (~1 hour) installation tokens minted on demand and cached in memory only.
 - PR diffs are read transiently to generate quiz questions and are **never
-  persisted**. Only the generated quiz questions (with correct answers,
-  server-side only) and a config snapshot are stored in D1 while a challenge
-  is active.
+  persisted**. D1 stores repository/PR identifiers, the resolved config
+  snapshot, active challenge state, generated quiz questions (with correct
+  answers, server-side only), and derived investigation summaries from public
+  PR context.
 - Once a challenge reaches a terminal state (`passed` or `failed_final`), its
   stored quiz question text is purged (`questions_json` is overwritten to an
   empty list) while score, answers, and telemetry are retained as an audit
   trail.
+- Before a quiz attempt starts, the contributor must accept a short challenge
+  terms acknowledgement. If they do not accept, no quiz attempt is created and
+  no answer or challenge telemetry is collected.
+- The visible CLAWPTCHA outcome is posted on the pull request in the same vein
+  as CI checks, branch-protection gates, review comments, and the contribution
+  itself. Detailed answer selections and summary telemetry remain audit data
+  for maintainers rather than a separate public profile.
 - Telemetry captured during the quiz is **summary statistics only** —
   per-question timings, answer-change counts, aggregate pointer-movement
   distance/sample counts, focus-loss counts, whether the report-only honeypot

@@ -23,6 +23,8 @@ exemptions: []
 # - author_association for GitHub relationship classes such as CONTRIBUTOR.
 # - repository_permission for role/permission names such as write, maintain,
 #   admin, or a custom GitHub repository role.
+# - github_team for org-managed groups such as maintainers or security.
+# - prior_merged_prs for contributors who have already landed enough work.
 # - linked_issue_match for trusted, planned work that matches a linked issue.
 
 signals:
@@ -33,6 +35,14 @@ max_attempts: 3
 cooldown_minutes: 15
 draft_prs: ignore
 require_approval: first_time
+
+accountability:
+  # When true, the PR body must include:
+  # - [x] I understand, tested, and can support this change.
+  require_pr_acknowledgement: false
+  # When true, the PR body must include a line such as:
+  # AI assistance: yes
+  require_ai_disclosure: false
 
 bot_policy:
   default: skip

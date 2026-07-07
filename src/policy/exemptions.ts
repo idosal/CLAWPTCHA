@@ -208,6 +208,18 @@ export interface RepositoryPermissionExemptionDeps {
   getUserPermission(repo: string, username: string): Promise<RepositoryAccess>;
 }
 
+export interface GitHubTeamExemptionDeps {
+  getTeamMembership(
+    org: string,
+    teamSlug: string,
+    username: string
+  ): Promise<{ state: string; role: string } | null>;
+}
+
+export interface PriorMergedPrsExemptionDeps {
+  countMergedPullRequestsByAuthor(repo: string, username: string): Promise<number>;
+}
+
 export async function evaluateRepositoryPermissionExemption(
   pr: RepositoryPermissionExemptionFacts,
   cfg: ClawptchaConfig,
@@ -228,6 +240,69 @@ export async function evaluateRepositoryPermissionExemption(
 
   if (matchedPermission) {
     return { exempt: true, reason: `trusted repository permission (${matchedPermission})` };
+  }
+  return { exempt: false };
+}
+
+function teamReference(repo: string, team: string): { org: string; slug: string; label: string } | null {
+  const [repoOwner] = repo.split("/");
+  if (!repoOwner) return null;
+  const parts = team.split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 1) {
+    return { org: repoOwner, slug: parts[0], label: `${repoOwner}/${parts[0]}` };
+  }
+  if (parts.length === 2) {
+    return { org: parts[0], slug: parts[1], label: `${parts[0]}/${parts[1]}` };
+  }
+  return null;
+}
+
+export async function evaluateGitHubTeamExemption(
+  pr: RepositoryPermissionExemptionFacts,
+  cfg: ClawptchaConfig,
+  deps: GitHubTeamExemptionDeps
+): Promise<ExemptionResult> {
+  for (const exemption of cfg.exemptions) {
+    if (exemption.type !== "github_team") continue;
+    const trustedRoles = new Set(exemption.roles ?? ["member", "maintainer"]);
+    for (const team of exemption.teams) {
+      const ref = teamReference(pr.repo, team);
+      if (!ref) continue;
+      try {
+        const membership = await deps.getTeamMembership(ref.org, ref.slug, pr.authorLogin);
+        if (
+          membership?.state === "active" &&
+          trustedRoles.has(membership.role.trim().toLowerCase() as "member" | "maintainer")
+        ) {
+          return { exempt: true, reason: `trusted GitHub team (${ref.label})` };
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+  return { exempt: false };
+}
+
+export async function evaluatePriorMergedPrsExemption(
+  pr: RepositoryPermissionExemptionFacts,
+  cfg: ClawptchaConfig,
+  deps: PriorMergedPrsExemptionDeps
+): Promise<ExemptionResult> {
+  const thresholds = cfg.exemptions
+    .filter((exemption) => exemption.type === "prior_merged_prs")
+    .map((exemption) => exemption.min_count);
+  if (thresholds.length === 0) return { exempt: false };
+
+  const minCount = Math.min(...thresholds);
+  let count: number;
+  try {
+    count = await deps.countMergedPullRequestsByAuthor(pr.repo, pr.authorLogin);
+  } catch {
+    return { exempt: false };
+  }
+  if (count >= minCount) {
+    return { exempt: true, reason: `author has ${count} prior merged PRs` };
   }
   return { exempt: false };
 }

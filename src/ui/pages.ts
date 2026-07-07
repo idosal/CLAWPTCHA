@@ -1049,6 +1049,76 @@ h1{
   text-align:center;
 }
 .turnstile-box:has(.cf-turnstile iframe) .turnstile-fallback{display:none}
+.privacy-note{
+  display:grid;
+  gap:10px;
+  max-width:68ch;
+  margin-top:20px;
+  padding:14px 15px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  background:var(--panel);
+  color:var(--ink-dim);
+  font-size:.94rem;
+}
+.privacy-note b{
+  display:block;
+  color:var(--ink);
+  font-weight:760;
+}
+.privacy-note a{
+  color:var(--accent);
+  font-weight:720;
+}
+.consent-check{
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  min-width:min(100%,520px);
+  padding:13px 14px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  background:var(--canvas);
+  color:var(--ink-dim);
+  cursor:pointer;
+}
+.consent-check input{
+  width:18px;
+  height:18px;
+  margin:2px 0 0;
+  accent-color:var(--brand);
+}
+.consent-check span{
+  overflow-wrap:anywhere;
+}
+.consent-check strong{
+  display:block;
+  color:var(--ink);
+  font-weight:760;
+}
+.consent-check small{
+  display:block;
+  margin-top:3px;
+  color:var(--ink-faint);
+  font-size:.86rem;
+  line-height:1.38;
+}
+.consent-check:has(input:focus-visible){
+  outline:3px solid var(--focus);
+  outline-offset:3px;
+}
+.form-error{
+  width:100%;
+  max-width:68ch;
+  padding:11px 13px;
+  border:1px solid color-mix(in oklch,var(--warn) 50%,var(--line));
+  border-radius:var(--radius-sm);
+  background:var(--warn-soft);
+  color:var(--warn);
+  font-size:.92rem;
+  font-weight:690;
+}
 .context-tabs{
   display:flex;
   align-items:center;
@@ -3668,11 +3738,11 @@ export function homePage(servedOrigin = "https://clawptcha.idosalomon.workers.de
 
   <section class="claw-hero" aria-labelledby="home-title">
     <div class="claw-copy">
-      <p class="claw-kicker">Yes to contributions. No to slop.</p>
+      <p class="claw-kicker">Free open-source PR governance for maintainers.</p>
       <h1 id="home-title">Proof before<br>review.</h1>
-      <p class="claw-lead">Let good PRs through. Ask contextless changes to prove ownership first.<br><b>AI is welcome. Unowned diffs are not.</b></p>
+      <p class="claw-lead">Let good PRs through. Ask contextless changes to prove ownership first. CLAWPTCHA complements code review, CI, tests, and branch protection.<br><b>AI is welcome. Unowned diffs are not.</b></p>
       <div class="claw-actions">
-        <a class="claw-button primary" href="#install">Use managed service</a>
+        <a class="claw-button primary" href="#install">Use free managed service</a>
         <a class="claw-button" href="https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA" target="_blank" rel="noopener noreferrer">Self-deploy</a>
       </div>
     </div>
@@ -3681,7 +3751,7 @@ export function homePage(servedOrigin = "https://clawptcha.idosalomon.workers.de
       <div class="receipt-head"><span class="receipt-dot" aria-hidden="true">!</span><div><strong>CLAWPTCHA check</strong><span>pull_request #482</span></div></div>
       <h2 class="receipt-title">Policy check</h2>
       <div class="receipt-lines">
-        <div class="receipt-line"><b>✓</b><span><strong>Policy loaded</strong><small>gates and exemptions from repo config</small></span></div>
+        <div class="receipt-line"><b>✓</b><span><strong>Policy loaded</strong><small>accountability, trust tiers, gates</small></span></div>
         <div class="receipt-line"><b>!</b><span><strong>Linked issue missing</strong><small>first-time contributor path</small></span></div>
         <div class="receipt-line"><b>!</b><span><strong>Proof required</strong><small>author explanation before review</small></span></div>
         <div class="receipt-line"><b>i</b><span><strong>Signals recorded</strong><small>honeypots stay report-only</small></span></div>
@@ -3691,21 +3761,23 @@ export function homePage(servedOrigin = "https://clawptcha.idosalomon.workers.de
   </section>
 
   <section class="policy-strip" id="policy" aria-label="CLAWPTCHA workflow">
-    <div class="policy-chip"><b>Read repo policy</b><span>gates and exemptions</span></div>
-    <div class="policy-chip"><b>Trust context</b><span>linked issues and prior passes</span></div>
-    <div class="policy-chip"><b>Ask for proof</b><span>only when policy calls for it</span></div>
+    <div class="policy-chip"><b>Read repo policy</b><span>accountability, gates, exemptions</span></div>
+    <div class="policy-chip"><b>Trust context</b><span>teams, roles, prior PRs</span></div>
+    <div class="policy-chip"><b>Scope the gate</b><span>drafts, files, and size</span></div>
     <div class="policy-chip"><b>Post check run</b><span>status, annotations, signals</span></div>
   </section>
 
   <section class="claw-section" id="why">
     <div>
       <h2>Keep maintainers in control.</h2>
-      <p>CLAWPTCHA is a PR governance layer. You choose when linked issues are enough, when authors must explain the diff, and which honeypot signals deserve attention. The default is fail-open.</p>
+      <p>CLAWPTCHA is a free open-source PR governance layer that fits alongside existing maintainer workflows. You choose the directories, draft behavior, contributor trust tiers, and accountability checks that should trigger proof. Honeypot and canary signals stay report-only. The default is fail-open.</p>
     </div>
     <aside class="install-ticket" id="install" aria-label="Install CLAWPTCHA">
       <h3>Install path</h3>
-      <div class="install-mode"><b>Managed free</b><span>Hosted CLAWPTCHA for open-source repos. Install the managed GitHub App; keep policy in your repo.</span></div>
-      <div class="install-mode"><b>Self-deploy</b><span>Run the Worker, D1, GitHub App, and model provider in your own Cloudflare account.</span></div>
+      <div class="install-mode"><b>Free managed</b><span>Hosted CLAWPTCHA is free for open-source repos. Install the managed GitHub App; keep policy in your repo.</span></div>
+      <div class="install-mode"><b>Self-deploy</b><span>Run the open-source Worker, D1, GitHub App, and model provider in your own Cloudflare account.</span></div>
+      <p>Privacy: the managed service is for installed public repositories; it stores public PR challenge state, contributor-accepted answers, and summary signals.</p>
+      <p>Team exemptions require GitHub Members read permission; leave them unset if you do not want team lookups.</p>
       <a class="claw-button primary" href="https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA" target="_blank" rel="noopener noreferrer">Deploy to Cloudflare</a>
       <p>Self-deploy CLI:</p>
       <code>npx wrangler login &amp;&amp; npm run setup</code>
@@ -3718,18 +3790,21 @@ export function homePage(servedOrigin = "https://clawptcha.idosalomon.workers.de
     <div class="docs-intro">
       <div>
         <h2 id="docs-title">Docs built for operators.</h2>
-        <p>The documentation now lives in a Starlight docs site with sidebar navigation, generated routes, anchored headings, tables, and code examples. Start with why the gate exists, roll out a first policy, then use the operator guides for issue triage, passive signals, common practices, and configuration.</p>
+        <p>The documentation now lives in a Starlight docs site with sidebar navigation, generated routes, anchored headings, tables, and code examples. Start with why the gate exists, roll out a first policy, then use the operator guides for issue triage, accountability, trust tiers, draft and path scope, passive signals, common practices, and configuration.</p>
       </div>
       <nav class="docs-index" aria-label="Documentation sections">
         <b>Documentation</b>
         <a href="/docs/">Overview</a>
         <a href="/docs/why-clawptcha/">Why use it</a>
         <a href="/docs/getting-started/">Getting started</a>
+        <a href="/docs/deployment/">Deployment</a>
         <a href="/docs/policy/">Policy evaluation</a>
         <a href="/docs/issue-triage/">Issue-backed triage</a>
         <a href="/docs/passive-signals/">Passive signals</a>
         <a href="/docs/challenge-lifecycle/">Challenge lifecycle</a>
         <a href="/docs/common-practices/">Common practices</a>
+        <a href="/docs/verification/">Verification checklist</a>
+        <a href="/docs/privacy-data/">Privacy and data</a>
         <a href="/docs/configuration/">Configuration</a>
       </nav>
     </div>
@@ -3740,15 +3815,19 @@ export function homePage(servedOrigin = "https://clawptcha.idosalomon.workers.de
       </a>
       <a href="/docs/why-clawptcha/">
         <b>Why use it</b>
-        <span>When CLAWPTCHA belongs in a repository review path, and what it deliberately does not solve.</span>
+        <span>When CLAWPTCHA belongs alongside code review, CI, tests, branch protection, and existing maintainer workflows.</span>
       </a>
       <a href="/docs/getting-started/">
         <b>Getting started</b>
         <span>Add the first policy file, test expected scenarios, and tighten only the paths that need it.</span>
       </a>
+      <a href="/docs/deployment/">
+        <b>Deployment</b>
+        <span>Choose managed service or self-deploy, then configure GitHub App, Turnstile, model provider, and Flue.</span>
+      </a>
       <a href="/docs/policy/">
         <b>Policy evaluation</b>
-        <span>Merge-target config, gates, exemptions, malformed-field fallback, and fail-open behavior.</span>
+        <span>Merge-target config, accountability preflight, trust tiers, exemptions, malformed-field fallback, and fail-open behavior.</span>
       </a>
       <a href="/docs/issue-triage/">
         <b>Issue-backed triage</b>
@@ -3760,28 +3839,37 @@ export function homePage(servedOrigin = "https://clawptcha.idosalomon.workers.de
       </a>
       <a href="/docs/common-practices/">
         <b>Common practices</b>
-        <span>Rollout guidance for honeypot files, issue-backed triage, path rules, drafts, and output volume.</span>
+        <span>Rollout guidance for trust tiers, honeypot files, issue-backed triage, path rules, drafts, and output volume.</span>
+      </a>
+      <a href="/docs/verification/">
+        <b>Verification checklist</b>
+        <span>Smoke-test real repository scenarios, failure drills, and rollout evidence before relying on the check.</span>
+      </a>
+      <a href="/docs/privacy-data/">
+        <b>Privacy and data</b>
+        <span>What managed CLAWPTCHA stores, what stays transient, and what contributors accept before a challenge starts.</span>
       </a>
       <a href="/docs/configuration/">
         <b>Configuration</b>
-        <span>The current policy surface for gates, exemptions, signals, approval, retries, and investigation.</span>
+        <span>The current policy surface for accountability, gates, trust tiers, file scope, drafts, signals, approval, retries, and investigation.</span>
       </a>
     </div>
   </section>
 
   <footer class="claw-footer">
-    <span>Maintainer infra with a weird little gate.</span>
-    <span>Managed free or self-deploy.</span>
+    <span>Free open-source maintainer infra with a weird little gate.</span>
+    <span>Free managed or self-deploy.</span>
   </footer>
 </div>`, {
     bodyClass: "site-body",
     mainClass: "site-page",
-    description: "CLAWPTCHA helps maintainers welcome real contributions while filtering slop with a managed free service or self-deployed GitHub PR governance."
+    description: "CLAWPTCHA is free open-source GitHub PR governance that complements code review, CI, tests, and branch protection with accountability checks and trust exemptions."
   });
 }
 
 export function startPage(
-  prRef: string, turnstileSiteKey: string, challengeId: string, honeypotEnabled = true
+  prRef: string, turnstileSiteKey: string, challengeId: string, honeypotEnabled = true,
+  startError = ""
 ): string {
   return layout("Challenge", `
 <div class="app">
@@ -3793,8 +3881,17 @@ export function startPage(
         <p class="kicker-row"><span class="pill">PR challenge</span><span class="ref">${esc(prRef)}</span></p>
         <h1 id="challenge-title">Show you understand this change before it merges.</h1>
         <p class="lead">CLAWPTCHA asks PR-specific questions about <b>intent, behavior, and blast radius</b>. It does not prove you are human. It records that you stood behind the change.</p>
+        <div class="privacy-note">
+          <p><b>Privacy posture</b>Managed CLAWPTCHA is for installed public repositories. Its PR check is part of the same public contribution surface as CI, review gates, and the pull request itself; detailed answers and summary signals are stored for maintainer review. Raw diffs are read transiently, and no keystrokes or answer text are recorded.</p>
+          <p><a href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Read the data note</a></p>
+        </div>
         <form class="start-actions" method="POST" action="/challenge/${esc(challengeId)}/start" id="startForm">
           ${honeypotField(honeypotEnabled)}
+          ${startError ? `<p class="form-error" role="alert">${esc(startError)}</p>` : ""}
+          <label class="consent-check">
+            <input type="checkbox" name="terms_acceptance" value="accepted" required>
+            <span><strong>I accept the challenge terms.</strong><small>Use this repository and PR context to generate the quiz, post the outcome on the PR like other review gates, and store my answers plus summary signals for the PR's maintainers.</small></span>
+          </label>
           <div class="turnstile-box"><div class="cf-turnstile" data-sitekey="${esc(turnstileSiteKey)}"></div><span class="turnstile-fallback">Turnstile check</span></div>
           <button class="btn" type="submit" id="startButton">Begin challenge</button>
         </form>

@@ -21,6 +21,7 @@ describe("buildManifest", () => {
       pull_requests: "write",
       contents: "read",
       metadata: "read",
+      members: "read",
     });
     expect(m.default_events).toEqual(["pull_request", "issue_comment", "installation"]);
     expect(m.public).toBe(false);

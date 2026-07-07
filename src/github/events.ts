@@ -7,10 +7,13 @@ import {
   resolveConfig,
   type ClawptchaConfig,
 } from "../config";
+import { evaluateAccountability } from "../policy/accountability";
 import { evaluateCodeHoneypotSignals, type CodeHoneypotResult } from "../policy/code-honeypot";
 import {
   applyPathRules,
   evaluateExemption,
+  evaluateGitHubTeamExemption,
+  evaluatePriorMergedPrsExemption,
   evaluateRepositoryPermissionExemption,
   shouldRechallengeOnPush,
 } from "../policy/exemptions";
@@ -136,6 +139,25 @@ export async function handlePullRequestEvent(
     return;
   }
 
+  const accountability = evaluateAccountability(pr.body, cfg);
+  if (!accountability.ok) {
+    await api.createCheckRun(repo, {
+      name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "failure",
+      output: {
+        title: "PR policy incomplete",
+        summary: withCodeHoneypotSummary(accountability.summary, codeHoneypot),
+      },
+    });
+    if (commentsEnabled(cfg)) {
+      await api.upsertPrComment(repo, prNumber, [
+        "## 🦞 Clawptcha",
+        "",
+        accountability.summary,
+      ].join("\n"));
+    }
+    return;
+  }
+
   const exemption = evaluateExemption(
     {
       authorLogin: pr.author_login,
@@ -158,6 +180,22 @@ export async function handlePullRequestEvent(
     return;
   }
 
+  const teamExemption = await evaluateGitHubTeamExemption(
+    { repo, authorLogin: pr.author_login },
+    cfg,
+    { getTeamMembership: (org, teamSlug, username) => api.getTeamMembership(org, teamSlug, username) }
+  );
+  if (teamExemption.exempt) {
+    await api.createCheckRun(repo, {
+      name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
+      output: {
+        title: "Exempt",
+        summary: withCodeHoneypotSummary(`No challenge required: ${teamExemption.reason}.`, codeHoneypot),
+      },
+    });
+    return;
+  }
+
   const repositoryPermissionExemption = await evaluateRepositoryPermissionExemption(
     { repo, authorLogin: pr.author_login },
     cfg,
@@ -172,6 +210,22 @@ export async function handlePullRequestEvent(
           `No challenge required: ${repositoryPermissionExemption.reason}.`,
           codeHoneypot
         ),
+      },
+    });
+    return;
+  }
+
+  const priorMergedPrsExemption = await evaluatePriorMergedPrsExemption(
+    { repo, authorLogin: pr.author_login },
+    cfg,
+    { countMergedPullRequestsByAuthor: (repoName, username) => api.countMergedPullRequestsByAuthor(repoName, username) }
+  );
+  if (priorMergedPrsExemption.exempt) {
+    await api.createCheckRun(repo, {
+      name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
+      output: {
+        title: "Exempt",
+        summary: withCodeHoneypotSummary(`No challenge required: ${priorMergedPrsExemption.reason}.`, codeHoneypot),
       },
     });
     return;

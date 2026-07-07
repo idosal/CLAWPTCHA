@@ -1,11 +1,61 @@
 ---
 title: Common practices
-description: Operational patterns for honeypot files, issue-backed triage, path-specific gates, drafts, retries, and output volume.
+description: Operational patterns for accountability, GitHub PR limits, trust tiers, honeypots, issue triage, path-specific gates, drafts, retries, and output volume.
 ---
 
 CLAWPTCHA works best as a maintainer-facing policy system. The strongest
 rollouts are explicit about what is trusted, what is merely suspicious, and
 what should still go to human review.
+
+## Document accountability, not AI purity
+
+Low-effort PRs are expensive because maintainers have to infer intent, check
+whether the author can iterate, and separate plausible-looking output from
+maintained work. Do not frame policy as "no AI." Frame it as responsibility:
+AI assistance is allowed, but the submitter must understand, test, explain, and
+support the change.
+
+Use `templates/contributing-policy.md` as a starting point for `CONTRIBUTING.md`
+and `templates/pull_request_template.md` as a PR template. CLAWPTCHA should
+reinforce that policy with an attestation challenge, not replace ordinary
+maintainer judgment.
+
+If the repository wants the PR template fields to be mandatory, enable the
+accountability preflight:
+
+```yaml
+accountability:
+  require_pr_acknowledgement: true
+  require_ai_disclosure: true
+```
+
+That check is deliberately about responsibility, not authorship detection.
+
+## Pair with GitHub-native volume controls
+
+For high-volume repositories, use GitHub's PR creation limits, trusted bypass
+lists, or temporary restrictions on who can open pull requests to reduce review
+load before a PR reaches CLAWPTCHA. CLAWPTCHA is best at proving understanding
+and preserving review evidence for PRs that are already in the queue; GitHub
+should own raw volume throttling.
+
+## Trust contributors in tiers
+
+Use `author_login` for named people, `github_team` for org-managed groups,
+`repository_permission` for repository roles, and `prior_merged_prs` when a
+repo wants to trust contributors after a visible body of merged work.
+
+```yaml
+exemptions:
+  - type: github_team
+    teams: [maintainers, security]
+  - type: prior_merged_prs
+    min_count: 3
+```
+
+Team checks require Members read permission on the GitHub App. Merged-PR counts
+use GitHub search. If either signal is unavailable, CLAWPTCHA falls back to the
+normal gate.
 
 ## Keep passive signals report-only
 
@@ -92,6 +142,10 @@ rechallenge:
   on_push: included_paths
   ignore_paths: ["docs/**", "*.md"]
 ```
+
+If `include_paths` is empty, `included_paths` behaves like `always`. That is a
+strict fallback so a typo or incomplete config does not silently preserve stale
+passes.
 
 ## Tune output for the repository
 

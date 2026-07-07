@@ -8,6 +8,12 @@ public/docs/
 .vite/
 *.tsbuildinfo
 
+# Root-level Codex/browser test image artifacts
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+
 # Cloudflare/local runtime state
 .wrangler/
 .mf/

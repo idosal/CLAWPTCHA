@@ -65,6 +65,10 @@ Challenge telemetry is stored as summary statistics:
 - form honeypot state;
 - code honeypot state.
 
+Those summaries are only collected after the contributor accepts the challenge
+terms on the start page. See [Privacy and data](/docs/privacy-data/) for the
+full data boundary.
+
 CLAWPTCHA treats two or more independent unusual signals as automation-likely
 for reporting purposes. A single signal is intentionally not enough: keyboard
 navigation, browser extensions, network issues, and accessibility setups can

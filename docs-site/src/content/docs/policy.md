@@ -1,6 +1,6 @@
 ---
 title: Policy evaluation
-description: How CLAWPTCHA loads repository policy and resolves gates, exemptions, and fail-open outcomes.
+description: How CLAWPTCHA loads repository policy and resolves accountability, gates, exemptions, and fail-open outcomes.
 ---
 
 CLAWPTCHA evaluates repository policy before it asks an author to do anything.
@@ -16,13 +16,14 @@ down the check or silently erase the rest of the repository policy.
 2. Apply the first matching `path_rules` override, if any changed file matches.
 3. Evaluate code honeypot signals against added diff lines so the result can be
    included even when the PR is later exempt.
-4. Resolve draft PR handling, built-in maintainer trust, author rules, bot
+4. Resolve draft PR handling.
+5. Run the optional `accountability` PR-body preflight.
+6. Resolve built-in maintainer trust, author rules, bot
    behavior, size, and path scope.
-5. Apply repository permission exemptions through GitHub's collaborator
-   permission API.
-6. Evaluate issue-backed context when `linked_issue_match` is configured.
-7. Reuse or invalidate a prior pass according to `rechallenge`.
-8. Create an author-facing challenge only if no exemption applies.
+7. Apply GitHub team, repository permission, and prior merged PR exemptions.
+8. Evaluate issue-backed context when `linked_issue_match` is configured.
+9. Reuse or invalidate a prior pass according to `rechallenge`.
+10. Create an author-facing challenge only if no exemption applies.
 
 Form honeypot signals are collected during challenge submission. Code honeypot
 signals are available earlier because they come from the pull request diff.
@@ -84,7 +85,11 @@ exemptions:
   - type: author_association
     associations: [CONTRIBUTOR]
   - type: repository_permission
-    permissions: [write]
+    permissions: [write, maintain, admin]
+  - type: github_team
+    teams: [maintainers, octo-org/security]
+  - type: prior_merged_prs
+    min_count: 3
   - type: linked_issue_match
     require_same_repo: true
     require_trusted_signal: true
@@ -99,6 +104,30 @@ maintainers can see why the author was not challenged.
 Owners, members, and collaborators are trusted by default. Configured
 exemptions are for additional trust relationships and planned work, not for
 hiding policy decisions.
+
+`repository_permission` matches GitHub's `role_name` values, including
+`maintain`, `admin`, and custom repository roles, as well as the legacy
+`permission` values returned by the same endpoint.
+
+`github_team` resolves active GitHub team membership and requires the GitHub App
+to have Members read permission. `prior_merged_prs` uses GitHub search to trust
+authors after enough merged PRs in the repository. Both fail closed when GitHub
+cannot resolve the signal.
+
+## Accountability preflight
+
+When enabled, `accountability` runs after draft handling and before exemptions
+or challenge creation. It fails the check if required PR-template fields are
+missing from the PR body.
+
+```yaml
+accountability:
+  require_pr_acknowledgement: true
+  require_ai_disclosure: true
+```
+
+This is meant for explicit maintainer policy: AI help is allowed, but the
+submitter must state that they understand, tested, and can support the change.
 
 ## Drafts and push updates
 
@@ -118,7 +147,9 @@ rechallenge:
 ```
 
 Use `included_paths` when a prior pass should survive docs/example updates but
-be invalidated by changes in core paths.
+be invalidated by changes in core paths. If the effective `include_paths` list
+is empty, `included_paths` falls back to strict behavior and rechallenges
+pushes that are not ignored by `rechallenge.ignore_paths`.
 
 ## Approval, attempts, and cooldown
 

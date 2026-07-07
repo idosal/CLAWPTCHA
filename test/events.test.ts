@@ -18,6 +18,8 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
     getFileContent: vi.fn(async () => null), // no clawptcha.yml → defaults
     upsertPrComment: vi.fn(async () => {}),
     getUserPermission: vi.fn(async () => "none"),
+    getTeamMembership: vi.fn(async () => null),
+    countMergedPullRequestsByAuthor: vi.fn(async () => 0),
     ...overrides,
   } as unknown as GitHubApi;
 }
@@ -296,6 +298,102 @@ describe("handlePullRequestEvent", () => {
       }),
     }));
     expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("exempts PR authors with a configured GitHub team", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "exemptions:",
+        "  - type: github_team",
+        "    teams: [maintainers]",
+        "",
+      ].join("\n")),
+      getTeamMembership: vi.fn(async () => ({ state: "active", role: "member" })),
+    });
+    const n = uniq + 22;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+
+    expect(api.getTeamMembership).toHaveBeenCalledWith("o", "maintainers", "contributor");
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({
+        title: "Exempt",
+        summary: expect.stringContaining("trusted GitHub team (o/maintainers)"),
+      }),
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("exempts PR authors with enough prior merged PRs", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "exemptions:",
+        "  - type: prior_merged_prs",
+        "    min_count: 3",
+        "",
+      ].join("\n")),
+      countMergedPullRequestsByAuthor: vi.fn(async () => 4),
+    });
+    const n = uniq + 23;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+
+    expect(api.countMergedPullRequestsByAuthor).toHaveBeenCalledWith("o/r", "contributor");
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({
+        title: "Exempt",
+        summary: expect.stringContaining("author has 4 prior merged PRs"),
+      }),
+    }));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("fails a PR with missing required accountability fields", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "accountability:",
+        "  require_pr_acknowledgement: true",
+        "  require_ai_disclosure: true",
+        "",
+      ].join("\n")),
+    });
+    const n = uniq + 24;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      status: "completed",
+      conclusion: "failure",
+      output: expect.objectContaining({
+        title: "PR policy incomplete",
+        summary: expect.stringContaining("AI disclosure line"),
+      }),
+    }));
+    expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", n, expect.stringContaining("PR body"));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).toBeNull();
+  });
+
+  it("continues when required accountability fields are present", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "accountability:",
+        "  require_pr_acknowledgement: true",
+        "  require_ai_disclosure: true",
+        "",
+      ].join("\n")),
+      getPr: vi.fn(async () => ({
+        ...pr,
+        body: [
+          "- [x] I understand, tested, and can support this change.",
+          "AI assistance: no",
+          "",
+        ].join("\n"),
+      })),
+    });
+    const n = uniq + 25;
+    await handlePullRequestEvent(testEnv, api, payloadFor(n));
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "abc123")).not.toBeNull();
   });
 
   it("is idempotent for the same head sha (webhook redelivery)", async () => {

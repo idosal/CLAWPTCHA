@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   applyPathRules,
   evaluateExemption,
+  evaluateGitHubTeamExemption,
+  evaluatePriorMergedPrsExemption,
   evaluateRepositoryPermissionExemption,
   matchesGlob,
   shouldRechallengeOnPush,
@@ -142,6 +144,70 @@ describe("evaluateExemption", () => {
       { repo: "o/r", authorLogin: "contributor" },
       cfg,
       { getUserPermission: async () => { throw new Error("missing permission"); } }
+    )).resolves.toEqual({ exempt: false });
+  });
+
+  it("exempts configured GitHub team members", async () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      exemptions: [{ type: "github_team" as const, teams: ["maintainers"], roles: ["maintainer" as const] }],
+    };
+
+    await expect(evaluateGitHubTeamExemption(
+      { repo: "octo-org/repo", authorLogin: "contributor" },
+      cfg,
+      {
+        getTeamMembership: async (org, teamSlug, username) => {
+          expect({ org, teamSlug, username }).toEqual({
+            org: "octo-org",
+            teamSlug: "maintainers",
+            username: "contributor",
+          });
+          return { state: "active", role: "maintainer" };
+        },
+      }
+    )).resolves.toEqual({
+      exempt: true,
+      reason: "trusted GitHub team (octo-org/maintainers)",
+    });
+  });
+
+  it("does not exempt missing or role-mismatched GitHub team members", async () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      exemptions: [{ type: "github_team" as const, teams: ["octo-org/security"], roles: ["maintainer" as const] }],
+    };
+
+    await expect(evaluateGitHubTeamExemption(
+      { repo: "octo-org/repo", authorLogin: "contributor" },
+      cfg,
+      { getTeamMembership: async () => ({ state: "active", role: "member" }) }
+    )).resolves.toEqual({ exempt: false });
+    await expect(evaluateGitHubTeamExemption(
+      { repo: "octo-org/repo", authorLogin: "contributor" },
+      cfg,
+      { getTeamMembership: async () => null }
+    )).resolves.toEqual({ exempt: false });
+  });
+
+  it("exempts authors with enough prior merged PRs", async () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      exemptions: [{ type: "prior_merged_prs" as const, min_count: 3 }],
+    };
+
+    await expect(evaluatePriorMergedPrsExemption(
+      { repo: "o/r", authorLogin: "contributor" },
+      cfg,
+      { countMergedPullRequestsByAuthor: async () => 4 }
+    )).resolves.toEqual({
+      exempt: true,
+      reason: "author has 4 prior merged PRs",
+    });
+    await expect(evaluatePriorMergedPrsExemption(
+      { repo: "o/r", authorLogin: "contributor" },
+      cfg,
+      { countMergedPullRequestsByAuthor: async () => 2 }
     )).resolves.toEqual({ exempt: false });
   });
 

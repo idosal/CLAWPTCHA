@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { env, createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import worker, { challengeDeps } from "../src/index";
 import { signBody } from "../src/github/webhook";
+import { signSessionCookie } from "../src/ui/session";
 import { DEFAULT_CONFIG } from "../src/config";
 import type { Env } from "../src/types";
 import type { PrContext } from "../src/challenge";
@@ -91,6 +92,36 @@ describe("GET /challenge/:id", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toContain("github.com/login/oauth/authorize");
     expect(res.headers.get("set-cookie")).toContain("clawptcha_session");
+  });
+});
+
+describe("POST /challenge/:id/start", () => {
+  it("requires challenge terms acceptance before creating a quiz attempt", async () => {
+    await testEnv.DB.prepare(
+      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
+        author_login, status, config_json) VALUES ('chTerms', 1, 'o/r', 3, 's3', 'alice', 'ready', '{}')`
+    ).run();
+    await testEnv.DB.prepare(
+      "INSERT INTO sessions (id, challenge_id, gh_login) VALUES ('sessTerms', 'chTerms', 'alice')"
+    ).run();
+    const cookie = await signSessionCookie(testEnv.SESSION_SIGNING_KEY, "sessTerms");
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(new Request("https://x/challenge/chTerms/start", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: `clawptcha_session=${cookie}`,
+      },
+      body: new URLSearchParams({ "cf-turnstile-response": "tok" }),
+    }), testEnv, ctx);
+
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("Accept the challenge terms to begin.");
+    expect(html).toContain('name="terms_acceptance"');
+    const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id='chTerms'")
+      .first<{ count: number }>();
+    expect(row?.count).toBe(0);
   });
 });
 

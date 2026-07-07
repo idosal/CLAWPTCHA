@@ -3,10 +3,12 @@ import { describe, it, expect } from "vitest";
 import defaultTemplateYaml from "../templates/clawptcha.yml?raw";
 import {
   getAuthorAssociationExemptions,
+  getGitHubTeamExemptions,
   getAuthorLoginExemptions,
   getLinkedIssueMatchExemption,
   getCodeHoneypotSignals,
   getMultipleChoiceGate,
+  getPriorMergedPrsExemptions,
   getRepositoryPermissionExemptions,
   hasHoneypotSignal,
   parseConfig,
@@ -123,6 +125,28 @@ describe("parseConfig", () => {
     }]);
   });
 
+  it("parses GitHub team and prior merged PR exemptions", () => {
+    const cfg = parseConfig([
+      "exemptions:",
+      "  - type: github_team",
+      "    teams: [Maintainers, octo-org/security, maintainers]",
+      "    roles: [maintainer]",
+      "  - type: prior_merged_prs",
+      "    min_count: 3",
+      "",
+    ].join("\n"));
+
+    expect(getGitHubTeamExemptions(cfg)).toEqual([{
+      type: "github_team",
+      teams: ["maintainers", "octo-org/security"],
+      roles: ["maintainer"],
+    }]);
+    expect(getPriorMergedPrsExemptions(cfg)).toEqual([{
+      type: "prior_merged_prs",
+      min_count: 3,
+    }]);
+  });
+
   it("enables report-only honeypot signals by default and supports opt-out", () => {
     expect(hasHoneypotSignal(parseConfig(null))).toBe(true);
     expect(parseConfig(null).signals).toEqual([{ type: "honeypot", report_only: true }]);
@@ -200,6 +224,20 @@ describe("parseConfig", () => {
     expect(cfg.rechallenge).toEqual({ on_push: "included_paths", ignore_paths: ["docs/**"] });
     expect(cfg.output).toEqual({ comments: "detailed", labels: false });
     expect(cfg.context.ignore_paths).toEqual(["dist/**", "*.lock"]);
+  });
+
+  it("parses accountability settings", () => {
+    const cfg = parseConfig([
+      "accountability:",
+      "  require_pr_acknowledgement: true",
+      "  require_ai_disclosure: true",
+      "",
+    ].join("\n"));
+
+    expect(cfg.accountability).toEqual({
+      require_pr_acknowledgement: true,
+      require_ai_disclosure: true,
+    });
   });
 
   it("maps legacy bot and rechallenge booleans into structured policies", () => {
@@ -304,6 +342,7 @@ describe("parseConfig", () => {
     a.context.ignore_paths.push("mutated/**");
     a.bot_policy.trusted_logins.push("bot");
     a.rechallenge.ignore_paths.push("mutated/**");
+    a.accountability.require_ai_disclosure = true;
     const codeSignal = a.signals.find((signal) => signal.type === "code_honeypot");
     codeSignal?.patterns.push("changed");
     const b = parseConfig(null);
@@ -318,6 +357,10 @@ describe("parseConfig", () => {
     expect(b.context.ignore_paths).toEqual([]);
     expect(b.bot_policy.trusted_logins).toEqual([]);
     expect(b.rechallenge.ignore_paths).toEqual([]);
+    expect(b.accountability).toEqual({
+      require_pr_acknowledgement: false,
+      require_ai_disclosure: false,
+    });
     expect(DEFAULT_CONFIG.pass_threshold).toBe(3);
   });
 
@@ -365,6 +408,25 @@ describe("parseConfig", () => {
     expect(getRepositoryPermissionExemptions(parseConfig(yaml))).toEqual([{
       type: "repository_permission",
       permissions: ["write"],
+    }]);
+  });
+
+  it("gives fresh arrays for GitHub team exemptions", () => {
+    const yaml = [
+      "exemptions:",
+      "  - type: github_team",
+      "    teams: [maintainers]",
+      "    roles: [member, maintainer]",
+      "",
+    ].join("\n");
+    const a = parseConfig(yaml);
+    getGitHubTeamExemptions(a)[0].teams.push("security");
+    getGitHubTeamExemptions(a)[0].roles?.push("member");
+
+    expect(getGitHubTeamExemptions(parseConfig(yaml))).toEqual([{
+      type: "github_team",
+      teams: ["maintainers"],
+      roles: ["member", "maintainer"],
     }]);
   });
 });

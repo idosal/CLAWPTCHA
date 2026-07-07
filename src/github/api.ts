@@ -36,6 +36,11 @@ export interface IssueDetails {
   isPullRequest: boolean;
 }
 
+export interface TeamMembershipDetails {
+  state: string;
+  role: string;
+}
+
 export interface PrFileDetails {
   filename: string;
   status: string;
@@ -233,5 +238,25 @@ export class GitHubApi {
       permission: data.permission ?? "none",
       role_name: data.role_name ?? data.permission ?? "none",
     };
+  }
+
+  async getTeamMembership(org: string, teamSlug: string, username: string): Promise<TeamMembershipDetails | null> {
+    const res = await this.req(
+      `/orgs/${encodeURIComponent(org)}/teams/${encodeURIComponent(teamSlug)}/memberships/${encodeURIComponent(username)}`
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { state?: string; role?: string };
+    return {
+      state: data.state ?? "unknown",
+      role: data.role ?? "member",
+    };
+  }
+
+  async countMergedPullRequestsByAuthor(repo: string, username: string): Promise<number> {
+    const q = `repo:${repo} is:pr is:merged author:${username}`;
+    const res = await this.req(`/search/issues?q=${encodeURIComponent(q)}&per_page=1`);
+    if (!res.ok) return 0;
+    const data = (await res.json()) as { total_count?: number };
+    return Math.max(0, data.total_count ?? 0);
   }
 }

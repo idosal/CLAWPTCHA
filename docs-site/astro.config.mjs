@@ -31,6 +31,7 @@ export default defineConfig({
             { label: "Overview", slug: "index" },
             { label: "Why use CLAWPTCHA", slug: "why-clawptcha" },
             { label: "Getting started", slug: "getting-started" },
+            { label: "Deployment", slug: "deployment" },
           ],
         },
         {
@@ -41,11 +42,13 @@ export default defineConfig({
             { label: "Passive signals", slug: "passive-signals" },
             { label: "Challenge lifecycle", slug: "challenge-lifecycle" },
             { label: "Common practices", slug: "common-practices" },
+            { label: "Verification checklist", slug: "verification" },
           ],
         },
         {
           label: "Reference",
           items: [
+            { label: "Privacy and data", slug: "privacy-data" },
             { label: "Configuration", slug: "configuration" },
           ],
         },

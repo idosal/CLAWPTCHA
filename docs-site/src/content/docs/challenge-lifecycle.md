@@ -18,7 +18,7 @@ authors. `always` applies it to every challenged PR. Maintainers approve with:
 /clawptcha approve
 ```
 
-Approvers must have write or admin permission on the repository.
+Approvers must have write/push, maintain, or admin access on the repository.
 
 ## Investigation
 
@@ -51,6 +51,12 @@ unknowns instead of pretending every changed line was inspected.
 The author signs in with GitHub before answering. The session is bound to the
 challenge author so a leaked or transplanted quiz cookie cannot expose questions
 to another account.
+
+Before quiz generation starts, the author accepts the challenge terms on the
+start page. If they do not accept, CLAWPTCHA does not create a quiz attempt or
+collect answer telemetry. The acknowledgement is intentionally small: it tells
+contributors that CLAWPTCHA uses the public PR context to generate the quiz and
+stores their answer selections plus summary signals for maintainer review.
 
 Each question is served with a time window. Refreshing the page does not reset
 the question timer.
@@ -103,3 +109,6 @@ open the service database.
 Quiz questions and correct answers are needed while a challenge is active. Once
 the challenge reaches a terminal result, stored question text is purged while
 score, answers, status, and summary telemetry remain as the audit trail.
+
+See [Privacy and data](/docs/privacy-data/) for the managed public-OSS data
+boundary and the contributor acceptance flow.

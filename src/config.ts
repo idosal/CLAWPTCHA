@@ -60,6 +60,11 @@ const DEFAULT_OUTPUT = Object.freeze({
   labels: true,
 });
 
+const DEFAULT_ACCOUNTABILITY = Object.freeze({
+  require_pr_acknowledgement: false,
+  require_ai_disclosure: false,
+});
+
 const multipleChoiceGateSchema = z.object({
   type: z.literal("multiple_choice"),
   questions: z.number().int().min(1).max(10).catch(DEFAULT_MULTIPLE_CHOICE_GATE.questions),
@@ -141,11 +146,28 @@ const repositoryPermissionExemptionSchema = z.object({
   permissions: normalizeStringList(exemption.permissions, lowerTrim),
 }));
 
+const githubTeamExemptionSchema = z.object({
+  type: z.literal("github_team"),
+  teams: stringList(50, 120).min(1).catch(() => []),
+  roles: z.array(z.enum(["member", "maintainer"])).min(1).max(2).optional().catch(undefined),
+}).transform((exemption) => ({
+  ...exemption,
+  teams: normalizeStringList(exemption.teams, lowerTrim),
+  roles: exemption.roles ? normalizeStringList(exemption.roles, lowerTrim) as Array<"member" | "maintainer"> : undefined,
+}));
+
+const priorMergedPrsExemptionSchema = z.object({
+  type: z.literal("prior_merged_prs"),
+  min_count: z.number().int().min(1).max(1000).catch(3),
+});
+
 const exemptionSchema = z.union([
   linkedIssueMatchExemptionSchema,
   authorAssociationExemptionSchema,
   authorLoginExemptionSchema,
   repositoryPermissionExemptionSchema,
+  githubTeamExemptionSchema,
+  priorMergedPrsExemptionSchema,
 ]);
 
 const pathRuleSchema = z.object({
@@ -210,6 +232,14 @@ const outputSchema = z.object({
   labels: DEFAULT_OUTPUT.labels,
 }));
 
+const accountabilitySchema = z.object({
+  require_pr_acknowledgement: z.boolean().catch(DEFAULT_ACCOUNTABILITY.require_pr_acknowledgement),
+  require_ai_disclosure: z.boolean().catch(DEFAULT_ACCOUNTABILITY.require_ai_disclosure),
+}).catch(() => ({
+  require_pr_acknowledgement: DEFAULT_ACCOUNTABILITY.require_pr_acknowledgement,
+  require_ai_disclosure: DEFAULT_ACCOUNTABILITY.require_ai_disclosure,
+}));
+
 const configSchema = z.object({
   pass_threshold: z.number().int().min(1).max(4).catch(3),
   gates: z.array(multipleChoiceGateSchema).min(1).catch(() => [{ ...DEFAULT_MULTIPLE_CHOICE_GATE }]),
@@ -237,6 +267,7 @@ const configSchema = z.object({
   // null = uncapped, since null is the documented default for this field.
   max_context_tokens: z.number().int().positive().nullable().catch(null),
   output: outputSchema,
+  accountability: accountabilitySchema,
 }).transform((cfg) => ({
   ...cfg,
   skip_authors: normalizeStringList(cfg.skip_authors, lowerTrim),
@@ -256,6 +287,8 @@ export type LinkedIssueMatchExemption = z.infer<typeof linkedIssueMatchExemption
 export type AuthorAssociationExemption = z.infer<typeof authorAssociationExemptionSchema>;
 export type AuthorLoginExemption = z.infer<typeof authorLoginExemptionSchema>;
 export type RepositoryPermissionExemption = z.infer<typeof repositoryPermissionExemptionSchema>;
+export type GitHubTeamExemption = z.infer<typeof githubTeamExemptionSchema>;
+export type PriorMergedPrsExemption = z.infer<typeof priorMergedPrsExemptionSchema>;
 
 function clonePathRule(rule: PathRule): PathRule {
   return {
@@ -297,6 +330,16 @@ function cloneExemption(exemption: ClawptchaExemption): ClawptchaExemption {
       logins: [...exemption.logins],
     };
   }
+  if (exemption.type === "github_team") {
+    return {
+      ...exemption,
+      teams: [...exemption.teams],
+      roles: exemption.roles ? [...exemption.roles] : undefined,
+    };
+  }
+  if (exemption.type === "prior_merged_prs") {
+    return { ...exemption };
+  }
   return {
     ...exemption,
     permissions: [...exemption.permissions],
@@ -328,6 +371,7 @@ function normalizeConfig(
       ignore_paths: [...parsed.rechallenge.ignore_paths],
     },
     output: { ...parsed.output },
+    accountability: { ...parsed.accountability },
     skip_authors: [...parsed.skip_authors],
     skip_paths: [...parsed.skip_paths],
     include_paths: [...parsed.include_paths],
@@ -387,8 +431,11 @@ function freezeConfig(cfg: ClawptchaConfig): ClawptchaConfig {
       Object.freeze(exemption.associations);
     } else if (exemption.type === "author_login") {
       Object.freeze(exemption.logins);
+    } else if (exemption.type === "github_team") {
+      Object.freeze(exemption.teams);
+      if (exemption.roles) Object.freeze(exemption.roles);
     } else {
-      Object.freeze(exemption.permissions);
+      if ("permissions" in exemption) Object.freeze(exemption.permissions);
     }
     Object.freeze(exemption);
   }
@@ -400,6 +447,7 @@ function freezeConfig(cfg: ClawptchaConfig): ClawptchaConfig {
   Object.freeze(cfg.rechallenge.ignore_paths);
   Object.freeze(cfg.rechallenge);
   Object.freeze(cfg.output);
+  Object.freeze(cfg.accountability);
   Object.freeze(cfg.gates);
   Object.freeze(cfg.path_rules);
   Object.freeze(cfg.signals);
@@ -450,6 +498,18 @@ export function getRepositoryPermissionExemptions(
   cfg: ClawptchaConfig
 ): RepositoryPermissionExemption[] {
   return cfg.exemptions.filter((exemption) => exemption.type === "repository_permission");
+}
+
+export function getGitHubTeamExemptions(
+  cfg: ClawptchaConfig
+): GitHubTeamExemption[] {
+  return cfg.exemptions.filter((exemption) => exemption.type === "github_team");
+}
+
+export function getPriorMergedPrsExemptions(
+  cfg: ClawptchaConfig
+): PriorMergedPrsExemption[] {
+  return cfg.exemptions.filter((exemption) => exemption.type === "prior_merged_prs");
 }
 
 export function parseConfig(yamlText: string | null): ClawptchaConfig {

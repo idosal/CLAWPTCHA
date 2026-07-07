@@ -81,6 +81,12 @@ function hasSubmittedHoneypot(form: Record<string, unknown>): boolean {
   return raw !== undefined && raw !== null;
 }
 
+function hasAcceptedChallengeTerms(form: Record<string, unknown>): boolean {
+  const raw = form.terms_acceptance;
+  if (Array.isArray(raw)) return raw.some((value) => value === "accepted");
+  return raw === "accepted";
+}
+
 function pathIgnored(path: string, patterns: string[]): boolean {
   return patterns.some((pattern) => matchesGlob(pattern, path));
 }
@@ -346,6 +352,23 @@ app.post("/challenge/:id/start", async (c) => {
   const session = await currentSession(c);
   if (!session?.gh_login) return c.redirect(`/challenge/${c.req.param("id")}`);
   const form = await c.req.parseBody();
+  if (!hasAcceptedChallengeTerms(form)) {
+    const challenge = await getChallenge(c.env.DB, c.req.param("id"));
+    if (!challenge) return c.html(errorPage("Cannot start", "Challenge not found."), 404);
+    if (challenge.author_login !== session.gh_login) {
+      return c.html(errorPage("Not your challenge",
+        `This challenge belongs to @${challenge.author_login}. You are signed in as @${session.gh_login}.`), 403);
+    }
+    if (challenge.status !== "ready") {
+      return c.html(errorPage("Challenge no longer active",
+        "This challenge is not currently ready. Check the PR for the current gate state."), 409);
+    }
+    const cfg = resolveConfig(challenge.config_json);
+    return c.html(startPage(
+      `${challenge.repo_full_name}#${challenge.pr_number}`, c.env.TURNSTILE_SITE_KEY, challenge.id,
+      hasHoneypotSignal(cfg), "Accept the challenge terms to begin."
+    ), 400);
+  }
   const result = await startQuizAttempt(
     c.env, challengeDeps(c.env), c.req.param("id"),
     session.gh_login, String(form["cf-turnstile-response"] ?? ""),
