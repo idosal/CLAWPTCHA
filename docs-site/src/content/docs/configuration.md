@@ -68,6 +68,9 @@ max_attempts: 3
 cooldown_minutes: 15
 draft_prs: ignore
 
+trust:
+  default_author_associations: [OWNER, MEMBER, COLLABORATOR]
+
 accountability:
   require_pr_acknowledgement: false
   require_ai_disclosure: false
@@ -109,7 +112,7 @@ output:
 | --- | --- | --- |
 | Author-facing proof | `gates` | The challenge type, question count, and passing threshold. |
 | Scope | `skip_paths`, `include_paths`, `min_changed_lines`, `path_rules` | Which PRs should skip, enter, or receive stricter policy. |
-| Trust | `exemptions`, `bot_policy` | Which authors, teams, repository roles, contributor history, and planned issues can avoid a challenge. |
+| Trust | `trust`, `exemptions`, `bot_policy` | Which default author associations, authors, teams, repository roles, contributor history, bots, and planned issues can avoid a challenge. |
 | Approval and retry | `require_approval`, `accountability`, `max_attempts`, `cooldown_minutes`, `draft_prs`, `rechallenge` | Human approval, required PR-body accountability fields, drafts, retry limits, cooldown, and new-commit behavior. |
 | Passive evidence | `signals`, `output.labels` | Honeypot fields, code canaries, and flagged-pass labels. |
 | Investigation | `context`, `max_context_tokens` | How PR evidence is condensed before quiz generation. |
@@ -198,8 +201,15 @@ exemptions:
     min_count: 3
 ```
 
-Owners, members, and collaborators are trusted by default. `author_login` and
-`author_association` add repository-specific trust. `repository_permission`
+Owners, members, and collaborators are trusted by default through `trust`.
+Set the list to `[]` when they should take the challenge too:
+
+```yaml
+trust:
+  default_author_associations: []
+```
+
+`author_login` and `author_association` add repository-specific trust. `repository_permission`
 reuses GitHub's collaborator permission API, matching both `role_name` values
 such as `maintain`, `admin`, and custom repository roles, and legacy
 `permission` values such as `write` or `read`. If GitHub cannot resolve access,
@@ -384,6 +394,7 @@ older truncation path.
 | `signals` | `[{ type: "honeypot", report_only: true }]` |
 | `exemptions` | `[]` |
 | `require_approval` | `first_time` |
+| `trust` | `{ default_author_associations: ["OWNER", "MEMBER", "COLLABORATOR"] }` |
 | `max_attempts` | `3` |
 | `cooldown_minutes` | `15` |
 | `draft_prs` | `ignore` |

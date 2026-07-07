@@ -18,7 +18,7 @@ down the check or silently erase the rest of the repository policy.
    included even when the PR is later exempt.
 4. Resolve draft PR handling.
 5. Run the optional `accountability` PR-body preflight.
-6. Resolve built-in maintainer trust, author rules, bot
+6. Resolve default author-association trust, author rules, bot
    behavior, size, and path scope.
 7. Apply GitHub team, repository permission, and prior merged PR exemptions.
 8. Evaluate issue-backed context when `linked_issue_match` is configured.
@@ -101,9 +101,15 @@ exemptions:
 When an exemption matches, CLAWPTCHA posts a success check with the reason so
 maintainers can see why the author was not challenged.
 
-Owners, members, and collaborators are trusted by default. Configured
-exemptions are for additional trust relationships and planned work, not for
-hiding policy decisions.
+Owners, members, and collaborators are trusted by default through `trust`.
+Configured exemptions are for additional trust relationships and planned work,
+not for hiding policy decisions. Set the list to `[]` when owners, members, and
+collaborators should take the challenge too.
+
+```yaml
+trust:
+  default_author_associations: []
+```
 
 `repository_permission` matches GitHub's `role_name` values, including
 `maintain`, `admin`, and custom repository roles, as well as the legacy

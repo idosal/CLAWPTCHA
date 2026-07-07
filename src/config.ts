@@ -17,6 +17,22 @@ const upperTrim = (value: string): string => value.trim().toUpperCase();
 const stringList = (maxItems: number, maxLength: number) =>
   z.array(z.string().trim().min(1).max(maxLength)).max(maxItems);
 const pathList = (maxItems = 100) => stringList(maxItems, 200);
+const AUTHOR_ASSOCIATIONS = [
+  "COLLABORATOR",
+  "CONTRIBUTOR",
+  "FIRST_TIMER",
+  "FIRST_TIME_CONTRIBUTOR",
+  "MANNEQUIN",
+  "MEMBER",
+  "NONE",
+  "OWNER",
+] as const;
+type AuthorAssociation = typeof AUTHOR_ASSOCIATIONS[number];
+const authorAssociationValueSchema = z.preprocess(
+  (value) => typeof value === "string" ? upperTrim(value) : value,
+  z.enum(AUTHOR_ASSOCIATIONS)
+);
+const authorAssociationListSchema = z.array(authorAssociationValueSchema).max(20);
 
 const DEFAULT_MULTIPLE_CHOICE_GATE = Object.freeze({
   type: "multiple_choice" as const,
@@ -63,6 +79,10 @@ const DEFAULT_OUTPUT = Object.freeze({
 const DEFAULT_ACCOUNTABILITY = Object.freeze({
   require_pr_acknowledgement: false,
   require_ai_disclosure: false,
+});
+
+const DEFAULT_TRUST = Object.freeze({
+  default_author_associations: Object.freeze(["OWNER", "MEMBER", "COLLABORATOR"] as AuthorAssociation[]),
 });
 
 const multipleChoiceGateSchema = z.object({
@@ -240,6 +260,17 @@ const accountabilitySchema = z.object({
   require_ai_disclosure: DEFAULT_ACCOUNTABILITY.require_ai_disclosure,
 }));
 
+const trustSchema = z.object({
+  default_author_associations: authorAssociationListSchema.catch(() => [
+    ...DEFAULT_TRUST.default_author_associations,
+  ]),
+}).transform((trust) => ({
+  ...trust,
+  default_author_associations: normalizeStringList(trust.default_author_associations),
+})).catch(() => ({
+  default_author_associations: [...DEFAULT_TRUST.default_author_associations],
+}));
+
 const configSchema = z.object({
   pass_threshold: z.number().int().min(1).max(4).catch(3),
   gates: z.array(multipleChoiceGateSchema).min(1).catch(() => [{ ...DEFAULT_MULTIPLE_CHOICE_GATE }]),
@@ -268,6 +299,7 @@ const configSchema = z.object({
   max_context_tokens: z.number().int().positive().nullable().catch(null),
   output: outputSchema,
   accountability: accountabilitySchema,
+  trust: trustSchema,
 }).transform((cfg) => ({
   ...cfg,
   skip_authors: normalizeStringList(cfg.skip_authors, lowerTrim),
@@ -372,6 +404,10 @@ function normalizeConfig(
     },
     output: { ...parsed.output },
     accountability: { ...parsed.accountability },
+    trust: {
+      ...parsed.trust,
+      default_author_associations: [...parsed.trust.default_author_associations],
+    },
     skip_authors: [...parsed.skip_authors],
     skip_paths: [...parsed.skip_paths],
     include_paths: [...parsed.include_paths],
@@ -448,6 +484,8 @@ function freezeConfig(cfg: ClawptchaConfig): ClawptchaConfig {
   Object.freeze(cfg.rechallenge);
   Object.freeze(cfg.output);
   Object.freeze(cfg.accountability);
+  Object.freeze(cfg.trust.default_author_associations);
+  Object.freeze(cfg.trust);
   Object.freeze(cfg.gates);
   Object.freeze(cfg.path_rules);
   Object.freeze(cfg.signals);

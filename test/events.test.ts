@@ -95,6 +95,35 @@ describe("handlePullRequestEvent", () => {
     expect(ch?.status).toBe("ready");
   });
 
+  it("creates a challenge for owner PRs when default author association trust is disabled", async () => {
+    const api = stubApi({
+      getFileContent: vi.fn(async () => [
+        "trust:",
+        "  default_author_associations: []",
+        "",
+      ].join("\n")),
+      getPr: vi.fn(async () => ({
+        ...pr,
+        author_login: "owner",
+        author_association: "OWNER",
+      })),
+    });
+    const n = uniq + 26;
+    const p = payloadFor(n);
+    p.pull_request.user.login = "owner";
+    p.pull_request.author_association = "OWNER";
+
+    await handlePullRequestEvent(testEnv, api, p);
+
+    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      name: "clawptcha",
+      head_sha: "abc123",
+      status: "queued",
+    }));
+    const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    expect(ch?.status).toBe("ready");
+  });
+
   it("neutralizes draft PRs when configured", async () => {
     const api = stubApi({
       getFileContent: vi.fn(async () => "draft_prs: neutral\n"),

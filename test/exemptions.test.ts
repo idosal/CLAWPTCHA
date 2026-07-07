@@ -96,6 +96,15 @@ describe("evaluateExemption", () => {
     }
   });
 
+  it("challenges maintainers when default author association trust is disabled", () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      trust: { default_author_associations: [] },
+    };
+
+    expect(evaluateExemption({ ...basePr, authorAssociation: "OWNER" }, cfg)).toEqual({ exempt: false });
+  });
+
   it("exempts configured trusted author associations", () => {
     const cfg = {
       ...DEFAULT_CONFIG,

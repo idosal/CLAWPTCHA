@@ -36,6 +36,11 @@ cooldown_minutes: 15
 draft_prs: ignore
 require_approval: first_time
 
+trust:
+  # Set default_author_associations: [] when owners, members, and
+  # collaborators should take the challenge too.
+  default_author_associations: [OWNER, MEMBER, COLLABORATOR]
+
 accountability:
   # When true, the PR body must include:
   # - [x] I understand, tested, and can support this change.

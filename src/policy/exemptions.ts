@@ -12,10 +12,12 @@ export interface PrFacts {
 
 export type ExemptionResult = { exempt: false } | { exempt: true; reason: string };
 
-const MAINTAINER_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
-
 function normalizeAssociation(association: string): string {
   return association.trim().toUpperCase();
+}
+
+function defaultAuthorAssociations(cfg: ClawptchaConfig): Set<string> {
+  return new Set(cfg.trust.default_author_associations.map(normalizeAssociation));
 }
 
 function configuredAuthorAssociations(cfg: ClawptchaConfig): Set<string> {
@@ -172,7 +174,7 @@ export function evaluateExemption(pr: PrFacts, cfg: ClawptchaConfig): ExemptionR
   if (configuredAuthorLogins(cfg).has(normalizeLogin(pr.authorLogin))) {
     return { exempt: true, reason: "author in author_login exemption" };
   }
-  if (MAINTAINER_ASSOCIATIONS.has(authorAssociation)) {
+  if (defaultAuthorAssociations(cfg).has(authorAssociation)) {
     return { exempt: true, reason: `maintainer (${authorAssociation})` };
   }
   if (configuredAuthorAssociations(cfg).has(authorAssociation)) {

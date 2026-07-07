@@ -240,6 +240,25 @@ describe("parseConfig", () => {
     });
   });
 
+  it("parses default trusted author associations", () => {
+    expect(parseConfig(null).trust.default_author_associations).toEqual(["OWNER", "MEMBER", "COLLABORATOR"]);
+    expect(parseConfig([
+      "trust:",
+      "  default_author_associations: [owner, member, owner]",
+      "",
+    ].join("\n")).trust.default_author_associations).toEqual(["OWNER", "MEMBER"]);
+    expect(parseConfig([
+      "trust:",
+      "  default_author_associations: []",
+      "",
+    ].join("\n")).trust.default_author_associations).toEqual([]);
+    expect(parseConfig([
+      "trust:",
+      "  default_author_associations: [owner, nope]",
+      "",
+    ].join("\n")).trust.default_author_associations).toEqual(["OWNER", "MEMBER", "COLLABORATOR"]);
+  });
+
   it("maps legacy bot and rechallenge booleans into structured policies", () => {
     expect(parseConfig("skip_bots: false\n").bot_policy.default).toBe("challenge");
     expect(parseConfig("rechallenge_on_push: true\n").rechallenge.on_push).toBe("always");
@@ -343,6 +362,7 @@ describe("parseConfig", () => {
     a.bot_policy.trusted_logins.push("bot");
     a.rechallenge.ignore_paths.push("mutated/**");
     a.accountability.require_ai_disclosure = true;
+    a.trust.default_author_associations.push("CONTRIBUTOR");
     const codeSignal = a.signals.find((signal) => signal.type === "code_honeypot");
     codeSignal?.patterns.push("changed");
     const b = parseConfig(null);
@@ -361,6 +381,7 @@ describe("parseConfig", () => {
       require_pr_acknowledgement: false,
       require_ai_disclosure: false,
     });
+    expect(b.trust.default_author_associations).toEqual(["OWNER", "MEMBER", "COLLABORATOR"]);
     expect(DEFAULT_CONFIG.pass_threshold).toBe(3);
   });
 

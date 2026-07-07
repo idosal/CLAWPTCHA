@@ -26,7 +26,7 @@ comprehension challenge before maintainer review.
 | Repository policy | `.github/clawptcha.yml` from the merge target | PRs cannot relax their own gate by editing config on the feature branch. |
 | Path-specific policy | first matching `path_rules` entry | Sensitive paths can override gates, approval, attempts, cooldown, and scope. |
 | Accountability | optional PR-body acknowledgement and AI disclosure fields | Missing required policy fields fail before a quiz is created. |
-| Exemptions | built-in maintainer trust, author rules, teams, repository roles, prior merged PRs, paths, size, issue context | Trusted or out-of-scope work gets an explanatory success check. |
+| Exemptions | configurable default author trust, author rules, teams, repository roles, prior merged PRs, paths, size, issue context | Trusted or out-of-scope work gets an explanatory success check. |
 | Passive signals | hidden form fields, code canaries, Turnstile, timing, automation hints | Findings are summarized for maintainers, never used as a quiz score. |
 | Challenge | generated questions about intent, behavior, affected surfaces, and blast radius | A passing author attests that they understand the change. |
 
