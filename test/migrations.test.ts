@@ -20,4 +20,12 @@ describe("D1 migrations", () => {
       .first<{ account_login: string }>();
     expect(row?.account_login).toBe("octocat");
   });
+
+  it("includes durable reconciliation markers on challenges", async () => {
+    const { results } = await env.DB.prepare("PRAGMA table_info(challenges)")
+      .all<{ name: string }>();
+    const columns = results.map((r) => r.name);
+    expect(columns).toContain("auto_closed_at");
+    expect(columns).toContain("terminal_reconciled_at");
+  });
 });

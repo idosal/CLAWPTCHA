@@ -12,6 +12,18 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
   return {
     updateCheckRun: vi.fn(async () => {}),
     getCheckRun: vi.fn(async () => ({ status: "queued", conclusion: null })),
+    getPr: vi.fn(async () => ({
+      number: 1,
+      head_sha: "sha-1",
+      author_login: "alice",
+      author_type: "User",
+      author_association: "CONTRIBUTOR",
+      draft: false,
+      additions: 1,
+      deletions: 0,
+      title: "Change",
+      body: null,
+    })),
     upsertPrComment: vi.fn(async () => {}),
     ensureLabel: vi.fn(async () => {}),
     addLabels: vi.fn(async () => {}),
@@ -24,13 +36,29 @@ const NOW = new Date("2026-07-02T12:00:00.000Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 60 * 60_000).toISOString();
 
 async function seedChallenge(opts: {
-  id: string; status: string; createdAt: string; checkRunId?: number | null; configJson?: string;
+  id: string;
+  status: string;
+  createdAt: string;
+  checkRunId?: number | null;
+  configJson?: string;
+  headSha?: string;
+  autoClosedAt?: string | null;
+  terminalReconciledAt?: string | null;
 }): Promise<void> {
   await testEnv.DB.prepare(
      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
-       author_login, check_run_id, status, config_json, created_at)
-     VALUES (?, 1, 'o/r', 1, ?, 'alice', ?, ?, ?, ?)`
-  ).bind(opts.id, `sha-${opts.id}`, opts.checkRunId ?? null, opts.status, opts.configJson ?? "{}", opts.createdAt).run();
+       author_login, check_run_id, status, config_json, auto_closed_at, terminal_reconciled_at, created_at)
+     VALUES (?, 1, 'o/r', 1, ?, 'alice', ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    opts.id,
+    opts.headSha ?? `sha-${opts.id}`,
+    opts.checkRunId ?? null,
+    opts.status,
+    opts.configJson ?? "{}",
+    opts.autoClosedAt ?? null,
+    opts.terminalReconciledAt ?? null,
+    opts.createdAt
+  ).run();
 }
 
 const scriptedTelemetry: Telemetry = {
@@ -50,7 +78,8 @@ function passedChallenge(): Challenge {
     id: "ch-1", installation_id: 1, repo_full_name: "o/r", pr_number: 1,
     head_sha: "sha-1", author_login: "alice", check_run_id: 42, status: "passed",
     approved_by: null, attempts_used: 1, cooldown_until: null,
-    config_json: "{}", created_at: "2026-07-02T10:00:00.000Z",
+    config_json: "{}", auto_closed_at: null, terminal_reconciled_at: null,
+    created_at: "2026-07-02T10:00:00.000Z",
   };
 }
 
@@ -155,6 +184,55 @@ describe("onChallengeResolved", () => {
     const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(patch.output.summary).toContain("auto-closed this pull request");
     expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("auto-closed this PR"));
+  });
+
+  it("records auto-close before updating the check run", async () => {
+    await seedChallenge({
+      id: "ch-1",
+      status: "failed_final",
+      createdAt: hoursAgo(1),
+      checkRunId: 42,
+      headSha: "sha-1",
+    });
+    const api = stubApi({
+      updateCheckRun: vi.fn(async () => { throw new Error("check update failed"); }),
+    });
+
+    await expect(onChallengeResolved(testEnv, {
+      challenge: { ...passedChallenge(), status: "failed_final" }, outcome: "failed_final",
+      score: 1, total: 4, telemetry: scriptedTelemetry, cfg: parseConfig("enforcement:\n  auto_close: true\n"),
+    }, async () => api)).rejects.toThrow("check update failed");
+
+    expect(api.closePullRequest).toHaveBeenCalledWith("o/r", 1);
+    const row = await testEnv.DB.prepare("SELECT auto_closed_at FROM challenges WHERE id='ch-1'")
+      .first<{ auto_closed_at: string | null }>();
+    expect(row?.auto_closed_at).toEqual(expect.any(String));
+  });
+
+  it("does not auto-close an obsolete terminal challenge for an older PR head", async () => {
+    const api = stubApi({
+      getPr: vi.fn(async () => ({
+        number: 1,
+        head_sha: "new-sha",
+        author_login: "alice",
+        author_type: "User",
+        author_association: "CONTRIBUTOR",
+        draft: false,
+        additions: 1,
+        deletions: 0,
+        title: "Change",
+        body: null,
+      })),
+    });
+    await onChallengeResolved(testEnv, {
+      challenge: { ...passedChallenge(), status: "failed_final" }, outcome: "failed_final",
+      score: 1, total: 4, telemetry: scriptedTelemetry, cfg: parseConfig("enforcement:\n  auto_close: true\n"),
+    }, async () => api);
+
+    expect(api.closePullRequest).not.toHaveBeenCalled();
+    const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(patch.output.summary).toContain("older commit");
+    expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("older commit"));
   });
 
   it("does not auto-close retryable failures", async () => {
@@ -286,6 +364,7 @@ describe("sweepStaleChallenges", () => {
       status: "failed_final",
       createdAt: hoursAgo(1),
       checkRunId: 701,
+      headSha: "sha-1",
       configJson: JSON.stringify(parseConfig("enforcement:\n  auto_close: true\n")),
     });
     const api = stubApi({
@@ -301,6 +380,49 @@ describe("sweepStaleChallenges", () => {
         summary: expect.stringContaining("auto-closed this pull request"),
       }),
     }));
+  });
+
+  it("does not re-close a PR during reconciliation after auto-close was recorded", async () => {
+    await seedChallenge({
+      id: "ch-recorded-close",
+      status: "failed_final",
+      createdAt: hoursAgo(1),
+      checkRunId: 702,
+      headSha: "sha-1",
+      configJson: JSON.stringify(parseConfig("enforcement:\n  auto_close: true\n")),
+      autoClosedAt: hoursAgo(0.5),
+    });
+    const api = stubApi({
+      getCheckRun: vi.fn(async () => ({ status: "queued", conclusion: null })),
+    });
+
+    await sweepStaleChallenges(testEnv, NOW, async () => api);
+
+    expect(api.getPr).not.toHaveBeenCalled();
+    expect(api.closePullRequest).not.toHaveBeenCalled();
+    expect(api.updateCheckRun).toHaveBeenCalledWith("o/r", 702, expect.objectContaining({
+      status: "completed", conclusion: "failure",
+      output: expect.objectContaining({
+        summary: expect.stringContaining("auto-closed this pull request"),
+      }),
+    }));
+  });
+
+  it("skips already reconciled terminal rows during reconciliation", async () => {
+    await seedChallenge({
+      id: "ch-reconciled",
+      status: "failed_final",
+      createdAt: hoursAgo(1),
+      checkRunId: 703,
+      terminalReconciledAt: hoursAgo(0.5),
+      configJson: JSON.stringify(parseConfig("enforcement:\n  auto_close: true\n")),
+    });
+    const api = stubApi();
+
+    await sweepStaleChallenges(testEnv, NOW, async () => api);
+
+    expect(api.getCheckRun).not.toHaveBeenCalledWith("o/r", 703);
+    expect(api.closePullRequest).not.toHaveBeenCalled();
   });
 
   it("reconciles a challenge created >24h ago whose quiz finished recently", async () => {

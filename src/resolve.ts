@@ -4,6 +4,7 @@ import { resolveConfig, shouldAutoClosePr, type VouchaConfig } from "./config";
 import { GitHubApi } from "./github/api";
 import { getInstallationToken } from "./github/auth";
 import { buildRiskReport, renderRiskReportMarkdown } from "./risk/report";
+import { markChallengeAutoClosed, markChallengeTerminalReconciled } from "./store";
 
 const FLAGGED_LABEL = "pr-comprehension:flagged";
 const FLAGGED_LABEL_COLOR = "b60205";
@@ -13,18 +14,21 @@ function challengeUrl(env: Env, challengeId: string): string {
   return `${env.APP_BASE_URL}/challenge/${challengeId}`;
 }
 
-type AutoCloseResult = "not_configured" | "closed" | "failed";
+type AutoCloseResult = "not_configured" | "closed" | "failed" | "stale_head";
 
 async function maybeAutoClosePr(
+  env: Env,
   api: GitHubApi,
   challenge: Challenge,
   cfg: VouchaConfig,
   outcome: string
 ): Promise<AutoCloseResult> {
   if (!shouldAutoClosePr(cfg, outcome)) return "not_configured";
+  if (challenge.auto_closed_at) return "closed";
+
+  let liveHeadSha: string;
   try {
-    await api.closePullRequest(challenge.repo_full_name, challenge.pr_number);
-    return "closed";
+    liveHeadSha = (await api.getPr(challenge.repo_full_name, challenge.pr_number)).head_sha;
   } catch (err) {
     console.error("auto-close pull request failed", {
       challengeId: challenge.id,
@@ -35,6 +39,40 @@ async function maybeAutoClosePr(
     });
     return "failed";
   }
+
+  if (liveHeadSha !== challenge.head_sha) {
+    console.warn("skipping auto-close for stale challenge head", {
+      challengeId: challenge.id,
+      repo: challenge.repo_full_name,
+      prNumber: challenge.pr_number,
+      challengeHeadSha: challenge.head_sha,
+      liveHeadSha,
+    });
+    return "stale_head";
+  }
+
+  try {
+    await api.closePullRequest(challenge.repo_full_name, challenge.pr_number);
+  } catch (err) {
+    console.error("auto-close pull request failed", {
+      challengeId: challenge.id,
+      repo: challenge.repo_full_name,
+      prNumber: challenge.pr_number,
+      outcome,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return "failed";
+  }
+
+  try {
+    await markChallengeAutoClosed(env.DB, challenge.id);
+  } catch (err) {
+    console.error("record auto-close failed", {
+      challengeId: challenge.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  return "closed";
 }
 
 function autoCloseCheckLine(result: AutoCloseResult): string | null {
@@ -43,6 +81,9 @@ function autoCloseCheckLine(result: AutoCloseResult): string | null {
   }
   if (result === "failed") {
     return "Repository policy is configured to auto-close this pull request, but VOUCHA could not close it. Maintainers should review manually.";
+  }
+  if (result === "stale_head") {
+    return "Repository policy did not auto-close this pull request because the challenge belongs to an older commit. Review the current PR check before merging.";
   }
   return null;
 }
@@ -59,12 +100,35 @@ function maintainerActionLine(result: AutoCloseResult): string {
   if (result === "failed") {
     return "Repository policy is configured to auto-close this PR, but VOUCHA could not close it. Maintainers: please review manually before merging.";
   }
+  if (result === "stale_head") {
+    return "Repository policy did not auto-close this PR because the failed challenge belongs to an older commit. Review the current PR check before merging.";
+  }
   return "Maintainers: please review this PR manually before merging.";
 }
 
 export async function apiForInstallation(env: Env, installationId: number): Promise<GitHubApi> {
   const token = await getInstallationToken(env.GITHUB_APP_ID, env.GITHUB_PRIVATE_KEY, installationId);
   return new GitHubApi(token);
+}
+
+type CheckRunPatch = Parameters<GitHubApi["updateCheckRun"]>[2];
+
+async function updateTerminalCheckRun(
+  env: Env,
+  api: GitHubApi,
+  challenge: Challenge,
+  patch: CheckRunPatch
+): Promise<void> {
+  if (!challenge.check_run_id) return;
+  await api.updateCheckRun(challenge.repo_full_name, challenge.check_run_id, patch);
+  try {
+    await markChallengeTerminalReconciled(env.DB, challenge.id);
+  } catch (err) {
+    console.error("record terminal reconciliation failed", {
+      challengeId: challenge.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export async function onChallengeResolved(
@@ -84,7 +148,7 @@ export async function onChallengeResolved(
 
   switch (r.outcome) {
     case "passed": {
-      if (checkId) await api.updateCheckRun(repo, checkId, {
+      await updateTerminalCheckRun(env, api, r.challenge, {
         status: "completed", conclusion: "success",
         details_url: url,
         output: {
@@ -142,8 +206,8 @@ export async function onChallengeResolved(
     }
     case "failed_assisted": {
       const reasonLine = r.failureReason ? `Reason: ${r.failureReason}\n\n` : "";
-      const autoClose = await maybeAutoClosePr(api, r.challenge, r.cfg, r.outcome);
-      if (checkId) await api.updateCheckRun(repo, checkId, {
+      const autoClose = await maybeAutoClosePr(env, api, r.challenge, r.cfg, r.outcome);
+      await updateTerminalCheckRun(env, api, r.challenge, {
         status: "completed", conclusion: "failure",
         details_url: url,
         output: {
@@ -170,8 +234,8 @@ export async function onChallengeResolved(
     case "failed_final": {
       const title = r.failureReason ? "Failed — bot verification" : "Failed — attempts exhausted";
       const reasonLine = r.failureReason ? `Reason: ${r.failureReason}\n\n` : "";
-      const autoClose = await maybeAutoClosePr(api, r.challenge, r.cfg, r.outcome);
-      if (checkId) await api.updateCheckRun(repo, checkId, {
+      const autoClose = await maybeAutoClosePr(env, api, r.challenge, r.cfg, r.outcome);
+      await updateTerminalCheckRun(env, api, r.challenge, {
         status: "completed", conclusion: "failure",
         details_url: url,
         output: {
@@ -198,7 +262,7 @@ export async function onChallengeResolved(
       break;
     }
     case "neutral": {
-      if (checkId) await api.updateCheckRun(repo, checkId, {
+      await updateTerminalCheckRun(env, api, r.challenge, {
         status: "completed", conclusion: "neutral",
         details_url: url,
         output: {
@@ -291,9 +355,15 @@ export async function sweepStaleChallenges(
     `SELECT * FROM challenges c
      WHERE c.status IN ('passed','failed_assisted','failed_final','neutral')
        AND c.check_run_id IS NOT NULL
+       AND c.terminal_reconciled_at IS NULL
        AND (c.created_at >= ?
             OR EXISTS (SELECT 1 FROM quizzes q WHERE q.challenge_id = c.id
                        AND q.finished_at IS NOT NULL AND q.finished_at >= ?))
+     ORDER BY COALESCE(
+       (SELECT MAX(q.finished_at) FROM quizzes q
+        WHERE q.challenge_id = c.id AND q.finished_at IS NOT NULL),
+       c.created_at
+     ) ASC, c.created_at ASC, c.id ASC
      LIMIT 100`
   ).bind(recentCutoff, recentCutoff).all<Challenge>();
 
@@ -303,14 +373,17 @@ export async function sweepStaleChallenges(
     try {
       const api = await apiFactory(env, ch.installation_id);
       const current = await api.getCheckRun(ch.repo_full_name, ch.check_run_id!);
-      if (current.status === "completed") continue; // callback succeeded; leave the real report intact
+      if (current.status === "completed") {
+        await markChallengeTerminalReconciled(env.DB, ch.id);
+        continue; // callback succeeded; leave the real report intact
+      }
 
       const quiz = await env.DB.prepare(
         "SELECT score FROM quizzes WHERE challenge_id=? AND score IS NOT NULL ORDER BY attempt_number DESC LIMIT 1"
       ).bind(ch.id).first<{ score: number }>();
       const scoreLine = quiz ? ` Final score: ${quiz.score}/4.` : "";
       const cfg = resolveConfig(ch.config_json);
-      const autoClose = await maybeAutoClosePr(api, ch, cfg, ch.status);
+      const autoClose = await maybeAutoClosePr(env, api, ch, cfg, ch.status);
       await api.updateCheckRun(ch.repo_full_name, ch.check_run_id!, {
         status: "completed", conclusion,
         output: {
@@ -324,6 +397,7 @@ export async function sweepStaleChallenges(
           ),
         },
       });
+      await markChallengeTerminalReconciled(env.DB, ch.id);
     } catch { /* try again next cron tick */ }
   }
 }

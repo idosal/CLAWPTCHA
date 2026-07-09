@@ -3,9 +3,7 @@ title: Why use VOUCHA
 description: When a repository should ask pull request authors for proof of understanding, and what VOUCHA deliberately does not claim to solve.
 ---
 
-VOUCHA is a free open-source project for a specific maintainer problem:
-more pull requests can now be produced cheaply, but review attention is still
-scarce. The product gives maintainers a policy layer between "trust every
+VOUCHA is a free open-source project for to help maintainers accept contributions without being overwhelmed by the wave of cheap pull requests that don't signal intent. The product gives maintainers a policy layer between "trust every
 contributor" and "close every unknown PR".
 
 It does not try to prove that a human wrote the code. It asks the PR author to
@@ -36,8 +34,6 @@ workflows, not replace them.
 - A replacement for tests, security review, code review, or branch protection.
 - A detector that decides whether a PR was written by AI.
 - A quality score for the implementation.
-- A hard service dependency that should stop merges when VOUCHA itself is
-  unavailable.
 
 The intended posture is fail-open and evidence-oriented. If quiz generation,
 model access, or an optional investigator service fails, VOUCHA should

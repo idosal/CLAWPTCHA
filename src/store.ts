@@ -43,7 +43,10 @@ export async function hasPassedChallenge(
   return row !== null;
 }
 
-export async function insertChallenge(db: D1Database, c: Omit<Challenge, "created_at">): Promise<void> {
+export async function insertChallenge(
+  db: D1Database,
+  c: Omit<Challenge, "auto_closed_at" | "created_at" | "terminal_reconciled_at">
+): Promise<void> {
   await db
     .prepare(
       `INSERT INTO challenges
@@ -56,6 +59,22 @@ export async function insertChallenge(db: D1Database, c: Omit<Challenge, "create
       c.check_run_id, c.status, c.approved_by, c.attempts_used, c.cooldown_until, c.config_json
     )
     .run();
+}
+
+export async function markChallengeAutoClosed(db: D1Database, id: string): Promise<void> {
+  await db.prepare(
+    `UPDATE challenges
+     SET auto_closed_at=COALESCE(auto_closed_at, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+     WHERE id=?`
+  ).bind(id).run();
+}
+
+export async function markChallengeTerminalReconciled(db: D1Database, id: string): Promise<void> {
+  await db.prepare(
+    `UPDATE challenges
+     SET terminal_reconciled_at=COALESCE(terminal_reconciled_at, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+     WHERE id=?`
+  ).bind(id).run();
 }
 
 export async function updateChallengeCheckRun(

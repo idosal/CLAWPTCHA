@@ -44,6 +44,8 @@ export interface Challenge {
   attempts_used: number;
   cooldown_until: string | null;
   config_json: string;
+  auto_closed_at: string | null;
+  terminal_reconciled_at: string | null;
   created_at: string;
 }
 
