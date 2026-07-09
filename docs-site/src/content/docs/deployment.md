@@ -1,10 +1,10 @@
 ---
 title: Deployment
-description: Self-deployed setup for CLAWPTCHA, including GitHub App, Turnstile, model provider, Flue, and cron requirements.
+description: Self-deployed setup for VOUCHA, including GitHub App, Turnstile, model provider, Flue, and cron requirements.
 ---
 
-CLAWPTCHA currently runs as a self-deployed Cloudflare Worker in your own
-account. Repository policy stays in `.github/clawptcha.yml`; credentials and
+VOUCHA currently runs as a self-deployed Cloudflare Worker in your own
+account. Repository policy stays in `.github/voucha.yml`; credentials and
 storage stay under the operator's Cloudflare and GitHub accounts.
 
 Self-deploy when you want to control Cloudflare account, storage, model
@@ -55,7 +55,8 @@ control every credential by hand.
 
    - webhook URL: `https://<your-worker>/webhook`;
    - events: Pull request, Issue comment, Installation;
-   - permissions: Checks read/write, Pull requests read/write, Contents
+   - permissions: Checks read/write, Pull requests read/write (comments and
+     optional auto-close), Contents
      read-only, Metadata read-only, Members read-only.
 
    Members read is needed only for `github_team` exemptions. Leave team
@@ -67,15 +68,25 @@ control every credential by hand.
    openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in app.pem -out app-pkcs8.pem
    ```
 
-4. Create a Cloudflare Turnstile widget for the Worker domain.
+4. Create a Cloudflare Turnstile widget for the Worker domain. Use a real
+   domain-bound widget in production, not Cloudflare's public testing keys.
 
-5. Set Worker secrets.
+5. Set public Worker vars.
+
+   ```text
+   APP_BASE_URL
+   TURNSTILE_SITE_KEY
+   LLM_PROVIDER
+   LLM_MODEL
+   AI_GATEWAY_ID
+   ```
+
+6. Set Worker secrets.
 
    ```text
    GITHUB_APP_ID
    GITHUB_PRIVATE_KEY
    GITHUB_WEBHOOK_SECRET
-   TURNSTILE_SITE_KEY
    TURNSTILE_SECRET_KEY
    SESSION_SIGNING_KEY
    LLM_API_KEY
@@ -108,7 +119,7 @@ Deploy the Flue Worker, then configure the main Worker with a service binding:
 
 ```jsonc
 "services": [
-  { "binding": "FLUE_INVESTIGATOR", "service": "clawptcha-flue-investigator" }
+  { "binding": "FLUE_INVESTIGATOR", "service": "voucha-flue-investigator" }
 ]
 ```
 
@@ -116,7 +127,7 @@ The Flue Worker is service-binding-only. It disables `workers.dev`, does not
 require a shared secret, and does not support an external URL fallback.
 
 If `context.investigator: flue` is configured and the service is unavailable,
-CLAWPTCHA reports neutral instead of falling back to raw large-diff generation.
+VOUCHA reports neutral instead of falling back to raw large-diff generation.
 
 ## Scheduled sweep
 

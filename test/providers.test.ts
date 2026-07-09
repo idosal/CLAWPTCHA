@@ -121,15 +121,18 @@ describe("workersAiProvider", () => {
       { role: "user", content: "PROMPT" },
     ]);
     expect(inputs.max_tokens).toBe(16000);
-    expect(inputs.response_format).toEqual({ type: "json_schema", json_schema: { type: "object" } });
+    expect(inputs.response_format).toEqual({
+      type: "json_schema",
+      json_schema: { name: "quiz", schema: { type: "object" }, strict: true },
+    });
     expect(options).toBeUndefined();
   });
 
   it("passes the AI Gateway id when configured", async () => {
     const ai = aiStub({ response: "{}" });
-    await workersAiProvider(ai, "m", "clawptcha-gw").complete(PARAMS);
+    await workersAiProvider(ai, "m", "voucha-gw").complete(PARAMS);
     const [, , options] = (ai.run as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(options).toEqual({ gateway: { id: "clawptcha-gw" } });
+    expect(options).toEqual({ gateway: { id: "voucha-gw" } });
   });
 
   it("also accepts OpenAI-shaped binding responses", async () => {

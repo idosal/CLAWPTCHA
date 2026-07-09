@@ -1,9 +1,9 @@
 ---
 title: Challenge lifecycle
-description: How CLAWPTCHA creates, serves, scores, and reports author comprehension challenges.
+description: How VOUCHA creates, serves, scores, and reports author comprehension challenges.
 ---
 
-When no exemption applies, CLAWPTCHA creates a challenge for the pull request
+When no exemption applies, VOUCHA creates a challenge for the pull request
 author. The challenge is a short comprehension check about the actual PR.
 
 It is not a humanity test. It is an author-ownership attestation.
@@ -15,14 +15,14 @@ Some PRs wait for maintainer approval before the author can open the quiz.
 authors. `always` applies it to every challenged PR. Maintainers approve with:
 
 ```text
-/clawptcha approve
+/voucha approve
 ```
 
 Approvers must have write/push, maintain, or admin access on the repository.
 
 ## Investigation
 
-Before quiz generation, CLAWPTCHA builds a cached investigation from PR
+Before quiz generation, VOUCHA builds a cached investigation from PR
 metadata, changed files, and selected patch evidence. The quiz is generated from
 that artifact instead of a blind prefix of a large diff.
 
@@ -49,15 +49,15 @@ unknowns instead of pretending every changed line was inspected.
 ## Challenge serving
 
 The author verifies from GitHub before answering by commenting a one-time
-`/clawptcha verify <code>` command on the PR. The challenge page copies the
+`/voucha verify <code>` command on the PR. The challenge page copies the
 command, opens the PR, and polls until GitHub's signed webhook binds that
-browser session to the PR author without granting CLAWPTCHA delegated account
+browser session to the PR author without granting VOUCHA delegated account
 access.
 
 Before quiz generation starts, the author accepts the challenge terms on the
-start page. If they do not accept, CLAWPTCHA does not create a quiz attempt or
+start page. If they do not accept, VOUCHA does not create a quiz attempt or
 collect answer telemetry. The acknowledgement is intentionally small: it tells
-contributors that CLAWPTCHA uses the public PR context to generate the quiz and
+contributors that VOUCHA uses the public PR context to generate the quiz and
 stores their answer selections plus summary signals for maintainer review.
 
 Each question is served with a time window. Refreshing the page does not reset
@@ -80,7 +80,7 @@ trivia.
 ## Retry behavior
 
 A failed non-final attempt enters cooldown. When the author retries after
-cooldown, CLAWPTCHA generates a fresh quiz from the cached investigation.
+cooldown, VOUCHA generates a fresh quiz from the cached investigation.
 
 ```yaml
 max_attempts: 3
@@ -88,7 +88,8 @@ cooldown_minutes: 15
 ```
 
 Once attempts are exhausted, the check becomes failed and maintainers should
-review manually.
+review manually. Repositories can optionally auto-close terminal hard failures
+with `enforcement.auto_close`.
 
 ## Outcomes
 
@@ -97,13 +98,14 @@ review manually.
 | Passed | Green check with an attestation summary. |
 | Passed with multiple passive signals | Green check, explicit risk title, and optional `pr-comprehension:flagged` label. |
 | Failed attempt | Cooldown and retry policy apply; detailed signal feedback is withheld until final outcome. |
-| Attempts exhausted | Maintainer review is requested. |
+| Challenge assistance detected | Failed check; optional PR auto-close when configured for `failed_assisted`. |
+| Attempts exhausted | Failed check; optional PR auto-close when configured for `failed_final`. |
 | Generation failure | Neutral check; the PR is not blocked by service failure. |
 | Superseded commit | Old challenge becomes inactive and the PR receives a current result. |
 | Expired setup | Scheduled sweep neutralizes stale awaiting or ready challenges. |
 
 The durable record is the check-run summary on the PR. It should show enough
-context for maintainers to understand what CLAWPTCHA did without making them
+context for maintainers to understand what VOUCHA did without making them
 open the service database.
 
 ## Data kept after resolution

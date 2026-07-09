@@ -15,6 +15,7 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
     upsertPrComment: vi.fn(async () => {}),
     ensureLabel: vi.fn(async () => {}),
     addLabels: vi.fn(async () => {}),
+    closePullRequest: vi.fn(async () => {}),
     ...overrides,
   } as unknown as GitHubApi;
 }
@@ -23,13 +24,13 @@ const NOW = new Date("2026-07-02T12:00:00.000Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 60 * 60_000).toISOString();
 
 async function seedChallenge(opts: {
-  id: string; status: string; createdAt: string; checkRunId?: number | null;
+  id: string; status: string; createdAt: string; checkRunId?: number | null; configJson?: string;
 }): Promise<void> {
   await testEnv.DB.prepare(
-    `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
+     `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
        author_login, check_run_id, status, config_json, created_at)
-     VALUES (?, 1, 'o/r', 1, ?, 'alice', ?, ?, '{}', ?)`
-  ).bind(opts.id, `sha-${opts.id}`, opts.checkRunId ?? null, opts.status, opts.createdAt).run();
+     VALUES (?, 1, 'o/r', 1, ?, 'alice', ?, ?, ?, ?)`
+  ).bind(opts.id, `sha-${opts.id}`, opts.checkRunId ?? null, opts.status, opts.configJson ?? "{}", opts.createdAt).run();
 }
 
 const scriptedTelemetry: Telemetry = {
@@ -127,7 +128,7 @@ describe("onChallengeResolved", () => {
     expect(patch.output.summary).not.toContain("Risk report");
     expect(patch.output.summary).not.toContain("under 10 seconds");
     expect(patch.details_url).toContain("/challenge/ch-1");
-    expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("Clawptcha — retry needed"));
+    expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("VOUCHA — retry needed"));
     expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("/challenge/ch-1"));
   });
 
@@ -141,6 +142,43 @@ describe("onChallengeResolved", () => {
     const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(patch.output.summary).toContain("Risk report");
     expect(patch.output.summary).toContain("every answer took under 10 seconds");
+  });
+
+  it("auto-closes configured terminal failures", async () => {
+    const api = stubApi();
+    await onChallengeResolved(testEnv, {
+      challenge: { ...passedChallenge(), status: "failed_final" }, outcome: "failed_final",
+      score: 1, total: 4, telemetry: scriptedTelemetry, cfg: parseConfig("enforcement:\n  auto_close: true\n"),
+    }, async () => api);
+
+    expect(api.closePullRequest).toHaveBeenCalledWith("o/r", 1);
+    const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(patch.output.summary).toContain("auto-closed this pull request");
+    expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("auto-closed this PR"));
+  });
+
+  it("does not auto-close retryable failures", async () => {
+    const api = stubApi();
+    await onChallengeResolved(testEnv, {
+      challenge: { ...passedChallenge(), status: "ready" }, outcome: "failed_retry",
+      score: 1, total: 4, telemetry: scriptedTelemetry, cfg: parseConfig("enforcement:\n  auto_close: true\n"),
+    }, async () => api);
+
+    expect(api.closePullRequest).not.toHaveBeenCalled();
+  });
+
+  it("keeps the failed check and comment when auto-close fails", async () => {
+    const api = stubApi({ closePullRequest: vi.fn(async () => { throw new Error("403"); }) });
+    await onChallengeResolved(testEnv, {
+      challenge: { ...passedChallenge(), status: "failed_assisted" }, outcome: "failed_assisted",
+      score: 4, total: 4, telemetry: scriptedTelemetry, cfg: parseConfig("enforcement:\n  auto_close: true\n"),
+      failureReason: "Challenge assistance signals were detected.",
+    }, async () => api);
+
+    expect(api.updateCheckRun).toHaveBeenCalled();
+    const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(patch.output.summary).toContain("could not close it");
+    expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("could not close it"));
   });
 
   it("still posts the attestation comment when labeling fails", async () => {
@@ -240,6 +278,29 @@ describe("sweepStaleChallenges", () => {
     }));
     const calls = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.some(([, id]) => id === 502)).toBe(false);
+  });
+
+  it("auto-closes configured terminal failures during reconciliation", async () => {
+    await seedChallenge({
+      id: "ch-close",
+      status: "failed_final",
+      createdAt: hoursAgo(1),
+      checkRunId: 701,
+      configJson: JSON.stringify(parseConfig("enforcement:\n  auto_close: true\n")),
+    });
+    const api = stubApi({
+      getCheckRun: vi.fn(async () => ({ status: "queued", conclusion: null })),
+    });
+
+    await sweepStaleChallenges(testEnv, NOW, async () => api);
+
+    expect(api.closePullRequest).toHaveBeenCalledWith("o/r", 1);
+    expect(api.updateCheckRun).toHaveBeenCalledWith("o/r", 701, expect.objectContaining({
+      status: "completed", conclusion: "failure",
+      output: expect.objectContaining({
+        summary: expect.stringContaining("auto-closed this pull request"),
+      }),
+    }));
   });
 
   it("reconciles a challenge created >24h ago whose quiz finished recently", async () => {

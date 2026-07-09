@@ -6,15 +6,15 @@ product
 
 ## Users
 
-Clawptcha serves two connected groups in GitHub pull request workflows.
+VOUCHA serves two connected groups in GitHub pull request workflows.
 
 PR authors use it when a repository asks them to prove they understand the change they submitted. Their context is high-friction and time-sensitive: they are trying to get a PR reviewed or merged, often after using AI assistance, and they need a challenge that feels fair, specific, and understandable.
 
-Maintainers use Clawptcha indirectly through GitHub checks, comments, attestation posts, and risk reports. Their job is not to judge whether code was AI-written; it is to see whether the author has engaged with the change enough to stand behind it, and whether a suspicious pass deserves closer review.
+Maintainers use VOUCHA indirectly through GitHub checks, comments, attestation posts, and risk reports. Their job is not to judge whether code was AI-written; it is to see whether the author has engaged with the change enough to stand behind it, and whether a suspicious pass deserves closer review.
 
 ## Product Purpose
 
-Clawptcha is a comprehension gate for GitHub contributions. It creates a short quiz from the PR itself, verifies that the PR author can answer questions about the intent and effects of the change, and posts an on-the-record attestation when they pass.
+VOUCHA is a comprehension gate for GitHub contributions. It creates a short quiz from the PR itself, verifies that the PR author can answer questions about the intent and effects of the change, and posts an on-the-record attestation when they pass.
 
 The product does not claim to prove humanness or defeat adversarial agents with browser control. Its value is forcing genuine engagement from careless contributors, turning dishonest bypasses into deliberate visible deception, and giving maintainers a behavioral risk report instead of a silent green check.
 
@@ -24,11 +24,11 @@ Success means the challenge feels legitimate to authors, useful to maintainers, 
 
 Sharp, fair, accountable.
 
-The voice should be direct without being punitive. Clawptcha can be memorable because the name is distinctive, but the interface should not make the gate feel like an inside joke, mascot brand, or tool for one source project. It should read as a precise maintainer tool with a clear ethical line: AI-written code is fine; not understanding it is not.
+The voice should be direct without being punitive. VOUCHA can be memorable because the name is distinctive, but the interface should not make the gate feel like an inside joke, mascot brand, or tool for one source project. It should read as a precise maintainer tool with a clear ethical line: AI-written code is fine; not understanding it is not.
 
 ## Anti-references
 
-Do not imply that Clawptcha proves a user is human, defeats all AI agents, or provides unbeatable security.
+Do not imply that VOUCHA proves a user is human, defeats all AI agents, or provides unbeatable security.
 
 Avoid invasive proctoring patterns: webcam checks, keystroke capture, clipboard policing, fake biometric presence, dark-pattern countdown pressure, or security theater that adds surveillance without improving comprehension.
 
@@ -38,7 +38,7 @@ Avoid locking future design work to the current server-rendered card flow. A ric
 
 ## Design Principles
 
-Make the trade explicit: Clawptcha is about comprehension attestation and risk visibility, not proof of humanness.
+Make the trade explicit: VOUCHA is about comprehension attestation and risk visibility, not proof of humanness.
 
 Respect the contributor's flow: the challenge should feel focused, bounded, and recoverable rather than hostile or surprising.
 
@@ -54,4 +54,4 @@ Target WCAG AA for user-facing surfaces. Preserve readable contrast, visible foc
 
 The quiz should remain usable under time pressure without becoming hostile. Timers must be visible and understandable, but the interface should avoid panic-inducing effects or inaccessible motion.
 
-Telemetry disclosure should stay plain and privacy-respecting: Clawptcha records summary timing and interaction statistics for risk reporting, plus whether decoy fields were submitted or maintainer-configured code canaries appeared in added diff lines. It does not record keystrokes, written content, webcam data, or invasive surveillance. Multiple independent challenge-taking signals can fail an otherwise correct quiz because challenge answers must be the author's own.
+Telemetry disclosure should stay plain and privacy-respecting: VOUCHA records summary timing and interaction statistics for risk reporting, plus whether decoy fields were submitted or maintainer-configured code canaries appeared in added diff lines. It does not record keystrokes, written content, webcam data, or invasive surveillance. Multiple independent challenge-taking signals can fail an otherwise correct quiz because challenge answers must be the author's own.

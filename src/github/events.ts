@@ -1,11 +1,11 @@
-import type { Env } from "../types";
+import type { Challenge, Env } from "../types";
 import type { GitHubApi } from "./api";
 import {
   getCodeHoneypotSignals,
   getLinkedIssueMatchExemption,
   parseConfig,
   resolveConfig,
-  type ClawptchaConfig,
+  type VouchaConfig,
 } from "../config";
 import { evaluateAccountability } from "../policy/accountability";
 import { evaluateCodeHoneypotSignals, type CodeHoneypotResult } from "../policy/code-honeypot";
@@ -37,7 +37,7 @@ async function evaluatePrCodeHoneypot(
   api: GitHubApi,
   repo: string,
   prNumber: number,
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): Promise<CodeHoneypotResult> {
   const signals = getCodeHoneypotSignals(cfg);
   if (signals.length === 0 || signals.every((signal) => signal.patterns.length === 0)) {
@@ -64,19 +64,19 @@ function challengeUrl(env: Env, challengeId: string): string {
   return `${env.APP_BASE_URL}/challenge/${challengeId}`;
 }
 
-function commentsEnabled(cfg: ClawptchaConfig): boolean {
+function commentsEnabled(cfg: VouchaConfig): boolean {
   return cfg.output.comments !== "quiet";
 }
 
-function commentBody(env: Env, challengeId: string, status: string, cfg: ClawptchaConfig, authorLogin: string): string {
+function commentBody(env: Env, challengeId: string, status: string, cfg: VouchaConfig, authorLogin: string): string {
   const url = challengeUrl(env, challengeId);
   if (status === "awaiting_approval") {
     return [
-      "## Clawptcha",
+      "## VOUCHA",
       "",
       "This PR requires a comprehension check before merge. A maintainer must approve the challenge first:",
       "",
-      "> Maintainers: comment `/clawptcha approve` to unlock the challenge.",
+      "> Maintainers: comment `/voucha approve` to unlock the challenge.",
       "",
       `Once approved, the author takes a short quiz about this change: ${url}`,
       "",
@@ -84,7 +84,7 @@ function commentBody(env: Env, challengeId: string, status: string, cfg: Clawptc
     ].join("\n");
   }
   return [
-    "## Clawptcha",
+    "## VOUCHA",
     "",
     `@${authorLogin}: take a short comprehension quiz about this change to turn the check green (${cfg.max_attempts} attempts max):`,
     "",
@@ -116,7 +116,7 @@ export async function handlePullRequestEvent(
 
   const pr = await api.getPr(repo, prNumber);
   // Config comes from the merge target, never the PR branch — a PR must not be able to weaken its own gate.
-  const configYaml = await api.getFileContent(repo, ".github/clawptcha.yml", baseConfigRef);
+  const configYaml = await api.getFileContent(repo, ".github/voucha.yml", baseConfigRef);
   let cfg = parseConfig(configYaml);
 
   // A new head SHA obsoletes any open challenge for this PR, regardless of
@@ -154,7 +154,7 @@ export async function handlePullRequestEvent(
     });
     if (commentsEnabled(cfg)) {
       await api.upsertPrComment(repo, prNumber, [
-        "## Clawptcha",
+        "## VOUCHA",
         "",
         accountability.summary,
       ].join("\n"));
@@ -293,7 +293,7 @@ export async function handlePullRequestEvent(
       title: needsApproval ? "Awaiting maintainer approval" : "Awaiting challenge",
       summary:
         (needsApproval
-          ? "A maintainer must approve the challenge (`/clawptcha approve`) before the author can take it."
+          ? "A maintainer must approve the challenge (`/voucha approve`) before the author can take it."
           : "The PR author must pass a comprehension quiz. Link in the PR comment.") +
         `\n\nChallenge link: ${challengeUrl(env, challengeId)}`,
     },
@@ -331,7 +331,10 @@ export async function handlePullRequestEvent(
 }
 
 export async function handleIssueCommentEvent(
-  env: Env, api: GitHubApi, payload: any
+  env: Env,
+  api: GitHubApi,
+  payload: any,
+  options: { prepareQuiz?: (challenge: Challenge) => Promise<void> } = {}
 ): Promise<void> {
   if (payload.action !== "created") return;
   if (!payload.issue?.pull_request) return; // not a PR comment
@@ -341,16 +344,23 @@ export async function handleIssueCommentEvent(
   const prNumber = payload.issue.number as number;
   const commenter = payload.comment.user.login as string;
 
-  const verification = /^\/clawptcha\s+verify\s+([a-f0-9]{6,64})\b/i.exec(body);
+  const verification = /^\/voucha\s+verify\s+([a-f0-9]{6,64})\b/i.exec(body);
   if (verification) {
     const challenge = await getLatestChallengeForPr(env.DB, repo, prNumber);
     if (!challenge) return;
     if (!sameGitHubLogin(challenge.author_login, commenter)) return;
-    await verifySessionFromComment(env.DB, challenge.id, verification[1].toLowerCase(), commenter);
+    const verified = await verifySessionFromComment(env.DB, challenge.id, verification[1].toLowerCase(), commenter);
+    if (verified && challenge.status === "ready") {
+      try {
+        await options.prepareQuiz?.(challenge);
+      } catch (err) {
+        console.error("verified-session quiz preparation failed", challenge.id, err);
+      }
+    }
     return;
   }
 
-  if (!/^\/clawptcha\s+approve\b/.test(body)) return;
+  if (!/^\/voucha\s+approve\b/.test(body)) return;
 
   const permission = await api.getUserPermission(repo, commenter);
   if (!hasWriteRepositoryAccess(permission)) return;

@@ -28,6 +28,8 @@ const AUTHOR_ASSOCIATIONS = [
   "OWNER",
 ] as const;
 type AuthorAssociation = typeof AUTHOR_ASSOCIATIONS[number];
+const AUTO_CLOSE_OUTCOMES = ["failed_assisted", "failed_final"] as const;
+export type AutoCloseOutcome = typeof AUTO_CLOSE_OUTCOMES[number];
 const authorAssociationValueSchema = z.preprocess(
   (value) => typeof value === "string" ? upperTrim(value) : value,
   z.enum(AUTHOR_ASSOCIATIONS)
@@ -74,6 +76,15 @@ const DEFAULT_DRAFT_PRS = "ignore" as const;
 const DEFAULT_OUTPUT = Object.freeze({
   comments: "normal" as const,
   labels: true,
+});
+
+const DEFAULT_AUTO_CLOSE = Object.freeze({
+  enabled: false,
+  outcomes: Object.freeze([...AUTO_CLOSE_OUTCOMES] as AutoCloseOutcome[]),
+});
+
+const DEFAULT_ENFORCEMENT = Object.freeze({
+  auto_close: DEFAULT_AUTO_CLOSE,
 });
 
 const DEFAULT_ACCOUNTABILITY = Object.freeze({
@@ -252,6 +263,46 @@ const outputSchema = z.object({
   labels: DEFAULT_OUTPUT.labels,
 }));
 
+function defaultAutoClosePolicy() {
+  return {
+    enabled: DEFAULT_AUTO_CLOSE.enabled,
+    outcomes: [...DEFAULT_AUTO_CLOSE.outcomes],
+  };
+}
+
+function isAutoCloseOutcome(value: string): value is AutoCloseOutcome {
+  return (AUTO_CLOSE_OUTCOMES as readonly string[]).includes(value);
+}
+
+function parseAutoCloseOutcomes(value: unknown): AutoCloseOutcome[] | undefined {
+  if (value === undefined) return undefined;
+  const values = Array.isArray(value) ? value : [value];
+  return unique(values
+    .filter((item): item is string => typeof item === "string")
+    .map(lowerTrim)
+    .filter(isAutoCloseOutcome));
+}
+
+const autoCloseSchema = z.union([
+  z.boolean().transform((enabled) => ({
+    enabled,
+    outcomes: [...DEFAULT_AUTO_CLOSE.outcomes],
+  })),
+  z.object({
+    enabled: z.boolean().catch(DEFAULT_AUTO_CLOSE.enabled),
+    outcomes: z.unknown().optional(),
+  }).transform((policy) => ({
+    enabled: policy.enabled,
+    outcomes: parseAutoCloseOutcomes(policy.outcomes) ?? [...DEFAULT_AUTO_CLOSE.outcomes],
+  })),
+]).catch(() => defaultAutoClosePolicy());
+
+const enforcementSchema = z.object({
+  auto_close: autoCloseSchema,
+}).catch(() => ({
+  auto_close: defaultAutoClosePolicy(),
+}));
+
 const accountabilitySchema = z.object({
   require_pr_acknowledgement: z.boolean().catch(DEFAULT_ACCOUNTABILITY.require_pr_acknowledgement),
   require_ai_disclosure: z.boolean().catch(DEFAULT_ACCOUNTABILITY.require_ai_disclosure),
@@ -298,6 +349,7 @@ const configSchema = z.object({
   // null = uncapped, since null is the documented default for this field.
   max_context_tokens: z.number().int().positive().nullable().catch(null),
   output: outputSchema,
+  enforcement: enforcementSchema,
   accountability: accountabilitySchema,
   trust: trustSchema,
 }).transform((cfg) => ({
@@ -307,14 +359,15 @@ const configSchema = z.object({
   include_paths: normalizeStringList(cfg.include_paths),
 }));
 
-type RawClawptchaConfig = z.infer<typeof configSchema>;
-export type ClawptchaConfig = RawClawptchaConfig;
+type RawVouchaConfig = z.infer<typeof configSchema>;
+export type VouchaConfig = RawVouchaConfig;
 export type MultipleChoiceGate = z.infer<typeof multipleChoiceGateSchema>;
 export type PathRule = z.infer<typeof pathRuleSchema>;
-export type ClawptchaSignal = z.infer<typeof signalSchema>;
-export type HoneypotSignal = Extract<ClawptchaSignal, { type: "honeypot" }>;
-export type CodeHoneypotSignal = Extract<ClawptchaSignal, { type: "code_honeypot" }>;
-export type ClawptchaExemption = z.infer<typeof exemptionSchema>;
+export type VouchaSignal = z.infer<typeof signalSchema>;
+export type HoneypotSignal = Extract<VouchaSignal, { type: "honeypot" }>;
+export type CodeHoneypotSignal = Extract<VouchaSignal, { type: "code_honeypot" }>;
+export type AutoClosePolicy = z.infer<typeof autoCloseSchema>;
+export type VouchaExemption = z.infer<typeof exemptionSchema>;
 export type LinkedIssueMatchExemption = z.infer<typeof linkedIssueMatchExemptionSchema>;
 export type AuthorAssociationExemption = z.infer<typeof authorAssociationExemptionSchema>;
 export type AuthorLoginExemption = z.infer<typeof authorLoginExemptionSchema>;
@@ -332,7 +385,7 @@ function clonePathRule(rule: PathRule): PathRule {
   };
 }
 
-function cloneSignal(signal: ClawptchaSignal): ClawptchaSignal {
+function cloneSignal(signal: VouchaSignal): VouchaSignal {
   if (signal.type === "code_honeypot") {
     return {
       ...signal,
@@ -343,7 +396,7 @@ function cloneSignal(signal: ClawptchaSignal): ClawptchaSignal {
   return { ...signal };
 }
 
-function cloneExemption(exemption: ClawptchaExemption): ClawptchaExemption {
+function cloneExemption(exemption: VouchaExemption): VouchaExemption {
   if (exemption.type === "linked_issue_match") {
     return {
       ...exemption,
@@ -379,11 +432,11 @@ function cloneExemption(exemption: ClawptchaExemption): ClawptchaExemption {
 }
 
 function normalizeConfig(
-  parsed: RawClawptchaConfig,
+  parsed: RawVouchaConfig,
   raw?: Record<string, unknown>
-): ClawptchaConfig {
+): VouchaConfig {
   const gates = parsed.gates.map((gate) => ({ ...gate }));
-  const cfg: ClawptchaConfig = {
+  const cfg: VouchaConfig = {
     ...parsed,
     gates,
     path_rules: parsed.path_rules.map(clonePathRule),
@@ -403,6 +456,12 @@ function normalizeConfig(
       ignore_paths: [...parsed.rechallenge.ignore_paths],
     },
     output: { ...parsed.output },
+    enforcement: {
+      auto_close: {
+        ...parsed.enforcement.auto_close,
+        outcomes: [...parsed.enforcement.auto_close.outcomes],
+      },
+    },
     accountability: { ...parsed.accountability },
     trust: {
       ...parsed.trust,
@@ -441,7 +500,7 @@ function normalizeConfig(
   return cfg;
 }
 
-function freezeConfig(cfg: ClawptchaConfig): ClawptchaConfig {
+function freezeConfig(cfg: VouchaConfig): VouchaConfig {
   for (const gate of cfg.gates) Object.freeze(gate);
   for (const rule of cfg.path_rules) {
     Object.freeze(rule.paths);
@@ -483,6 +542,9 @@ function freezeConfig(cfg: ClawptchaConfig): ClawptchaConfig {
   Object.freeze(cfg.rechallenge.ignore_paths);
   Object.freeze(cfg.rechallenge);
   Object.freeze(cfg.output);
+  Object.freeze(cfg.enforcement.auto_close.outcomes);
+  Object.freeze(cfg.enforcement.auto_close);
+  Object.freeze(cfg.enforcement);
   Object.freeze(cfg.accountability);
   Object.freeze(cfg.trust.default_author_associations);
   Object.freeze(cfg.trust);
@@ -496,61 +558,66 @@ function freezeConfig(cfg: ClawptchaConfig): ClawptchaConfig {
   return Object.freeze(cfg);
 }
 
-function freshDefaults(): ClawptchaConfig {
+function freshDefaults(): VouchaConfig {
   return normalizeConfig(configSchema.parse({}));
 }
 
-export const DEFAULT_CONFIG: ClawptchaConfig = freezeConfig(freshDefaults());
+export const DEFAULT_CONFIG: VouchaConfig = freezeConfig(freshDefaults());
 
-export function getMultipleChoiceGate(cfg: ClawptchaConfig): MultipleChoiceGate {
+export function getMultipleChoiceGate(cfg: VouchaConfig): MultipleChoiceGate {
   return cfg.gates.find((gate) => gate.type === "multiple_choice") ?? { ...DEFAULT_MULTIPLE_CHOICE_GATE };
 }
 
-export function hasHoneypotSignal(cfg: ClawptchaConfig): boolean {
+export function shouldAutoClosePr(cfg: VouchaConfig, outcome: string): outcome is AutoCloseOutcome {
+  return cfg.enforcement.auto_close.enabled &&
+    cfg.enforcement.auto_close.outcomes.includes(outcome as AutoCloseOutcome);
+}
+
+export function hasHoneypotSignal(cfg: VouchaConfig): boolean {
   return cfg.signals.some((signal) => signal.type === "honeypot");
 }
 
-export function getCodeHoneypotSignals(cfg: ClawptchaConfig): CodeHoneypotSignal[] {
+export function getCodeHoneypotSignals(cfg: VouchaConfig): CodeHoneypotSignal[] {
   return cfg.signals.filter((signal) => signal.type === "code_honeypot");
 }
 
 export function getLinkedIssueMatchExemption(
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): LinkedIssueMatchExemption | null {
   return cfg.exemptions.find((exemption) => exemption.type === "linked_issue_match") ?? null;
 }
 
 export function getAuthorAssociationExemptions(
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): AuthorAssociationExemption[] {
   return cfg.exemptions.filter((exemption) => exemption.type === "author_association");
 }
 
 export function getAuthorLoginExemptions(
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): AuthorLoginExemption[] {
   return cfg.exemptions.filter((exemption) => exemption.type === "author_login");
 }
 
 export function getRepositoryPermissionExemptions(
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): RepositoryPermissionExemption[] {
   return cfg.exemptions.filter((exemption) => exemption.type === "repository_permission");
 }
 
 export function getGitHubTeamExemptions(
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): GitHubTeamExemption[] {
   return cfg.exemptions.filter((exemption) => exemption.type === "github_team");
 }
 
 export function getPriorMergedPrsExemptions(
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): PriorMergedPrsExemption[] {
   return cfg.exemptions.filter((exemption) => exemption.type === "prior_merged_prs");
 }
 
-export function parseConfig(yamlText: string | null): ClawptchaConfig {
+export function parseConfig(yamlText: string | null): VouchaConfig {
   if (!yamlText) return freshDefaults();
   let raw: unknown;
   try {
@@ -567,7 +634,7 @@ export function parseConfig(yamlText: string | null): ClawptchaConfig {
 }
 
 // Parse a stored config_json snapshot back into a validated config.
-export function resolveConfig(json: string): ClawptchaConfig {
+export function resolveConfig(json: string): VouchaConfig {
   try {
     const raw = JSON.parse(json) as unknown;
     if (raw === null || Array.isArray(raw) || typeof raw !== "object") return DEFAULT_CONFIG;

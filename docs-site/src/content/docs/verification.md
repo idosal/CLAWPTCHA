@@ -1,6 +1,6 @@
 ---
 title: Verification checklist
-description: Manual smoke tests, rollout checks, and known limitations for operating CLAWPTCHA on a real repository.
+description: Manual smoke tests, rollout checks, and known limitations for operating VOUCHA on a real repository.
 ---
 
 Use this page after installation or after changing policy. The automated test
@@ -29,10 +29,10 @@ npx wrangler deploy --dry-run
 Use a demo repository with the GitHub App installed.
 
 - Open a PR from a non-maintainer account. The check should be queued and the
-  PR should receive a CLAWPTCHA comment.
+  PR should receive a VOUCHA comment.
 - If `require_approval: first_time` applies, the challenge should wait for
-  `/clawptcha approve`.
-- Comment `/clawptcha approve` from a write or admin user. The comment should
+  `/voucha approve`.
+- Comment `/voucha approve` from a write or admin user. The comment should
   update with the challenge link.
 - Open the link as the PR author, accept the challenge terms, pass Turnstile,
   and answer the quiz.
@@ -58,7 +58,7 @@ Walk each scenario that the repository intends to rely on:
 
 ## Failure drills
 
-CLAWPTCHA should fail open for service-side problems and fail closed only for
+VOUCHA should fail open for service-side problems and fail closed only for
 repository policy requirements.
 
 - Temporarily break the model provider or model name, then start a quiz. The
@@ -69,6 +69,8 @@ repository policy requirements.
   later retry should get a fresh quiz.
 - Exhaust all attempts. The check should stay failed for manual maintainer
   review.
+- With `enforcement.auto_close` enabled, exhaust all attempts or trigger a hard
+  assistance failure. The check should stay failed and the PR should close.
 - Leave an awaiting or ready challenge untouched. The scheduled sweep should
   neutralize stale setup after the configured stale window.
 
@@ -77,7 +79,7 @@ repository policy requirements.
 For each rollout, record:
 
 - repository and PR used for the smoke test;
-- effective `.github/clawptcha.yml`;
+- effective `.github/voucha.yml`;
 - expected and observed check conclusion;
 - whether a PR comment was created or updated;
 - whether the author-facing quiz link worked;
@@ -86,7 +88,7 @@ For each rollout, record:
 
 ## Known limitations
 
-CLAWPTCHA is an accountability and review-evidence layer, not an unbeatable
+VOUCHA is an accountability and review-evidence layer, not an unbeatable
 security boundary.
 
 - An agent with browser control can potentially take the quiz on behalf of the
@@ -100,5 +102,5 @@ security boundary.
   accepts the webhook, recovery depends on GitHub redelivery, idempotent event
   handling, and the scheduled sweep.
 - PR comment lookup currently checks one page of issue comments. Very noisy PRs
-  can receive a duplicate CLAWPTCHA comment if the tracked comment is beyond
+  can receive a duplicate VOUCHA comment if the tracked comment is beyond
   that page.

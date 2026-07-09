@@ -16,6 +16,10 @@ export interface Env {
   TURNSTILE_SITE_KEY: string;
   TURNSTILE_SECRET_KEY: string;
   SESSION_SIGNING_KEY: string;
+  // Temporary access control. Comma/whitespace-separated `owner/repo` or bare
+  // `owner` entries; empty/unset means act on every installed repo. See
+  // src/github/allowlist.ts.
+  REPO_ALLOWLIST?: string;
 }
 
 export type ChallengeStatus =
@@ -52,6 +56,13 @@ export interface PrInvestigation {
   status: "ready" | "failed";
   artifact_json: string;
   error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PreparedQuiz {
+  challenge_id: string;
+  questions_json: string;
   created_at: string;
   updated_at: string;
 }

@@ -74,7 +74,7 @@ export async function getInstallationToken(
       headers: {
         authorization: `Bearer ${jwt}`,
         accept: "application/vnd.github+json",
-        "user-agent": "clawptcha",
+        "user-agent": "voucha",
         ...(hasBody ? { "content-type": "application/json" } : {}),
       },
       ...(hasBody ? { body: JSON.stringify(body) } : {}),

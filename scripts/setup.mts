@@ -1,4 +1,4 @@
-// scripts/setup.mts — interactive one-command deployment for Clawptcha.
+// scripts/setup.mts — interactive one-command deployment for VOUCHA.
 //   npx wrangler login && npm run setup
 // Phases: preflight → deploy+URL → GitHub App (manifest flow) → Turnstile →
 // session key → secrets (bulk over stdin; never argv, never disk) → finalize.
@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import * as readline from "node:readline/promises";
 import {
   buildManifest, manifestFormHtml, parseDeployedUrl, patchAppBaseUrl,
-  pkcs1ToPkcs8, buildSecretsJson,
+  patchTurnstileSiteKey, pkcs1ToPkcs8, buildSecretsJson,
 } from "./setup-lib.mts";
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -97,7 +97,7 @@ try {
   die("Deploy failed. Fix the error above, or follow the Manual setup section in README.md, then re-run.");
 }
 let baseUrl = parseDeployedUrl(deployOut) ?? "";
-if (!baseUrl) baseUrl = await ask("Could not detect the Worker URL — paste your Worker's public origin (e.g. https://clawptcha.<your-subdomain>.workers.dev or your custom domain)");
+if (!baseUrl) baseUrl = await ask("Could not detect the Worker URL — paste your Worker's public origin (e.g. https://voucha.<your-subdomain>.workers.dev or your custom domain)");
 baseUrl = baseUrl.replace(/\/+$/, "");
 console.log(`✓ Worker at ${baseUrl}`);
 
@@ -113,7 +113,7 @@ if (patched.changed) {
 
 // ---------- Phase 3: GitHub App via manifest flow ----------
 banner("GitHub App");
-const appName = await ask("GitHub App name", `clawptcha-pr-check-${accountId.slice(0, 6)}`);
+const appName = await ask("GitHub App name", `voucha-pr-check-${accountId.slice(0, 6)}`);
 const state = randomBytes(16).toString("hex");
 
 interface AppConfig {
@@ -157,7 +157,7 @@ const appConfig = await new Promise<AppConfig>((resolve, reject) => {
         if (!r.ok) throw new Error(`conversion failed: HTTP ${r.status}`);
         const cfg = (await r.json()) as AppConfig;
         res.writeHead(200, { "content-type": "text/html" })
-          .end("<h2>✓ Clawptcha PR check app created.</h2>You can close this tab and return to the terminal.");
+          .end("<h2>✓ VOUCHA PR check app created.</h2>You can close this tab and return to the terminal.");
         done(cfg);
       } catch (e) {
         res.writeHead(500).end("exchange failed — see terminal");
@@ -192,7 +192,7 @@ if (apiToken) {
     const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/challenges/widgets`, {
       method: "POST",
       headers: { authorization: `Bearer ${apiToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ name: "CLAWPTCHA PR check", domains: [host], mode: "managed" }),
+      body: JSON.stringify({ name: "VOUCHA PR check", domains: [host], mode: "managed" }),
     });
     const data = (await r.json()) as { success: boolean; result?: { sitekey: string; secret: string } };
     if (!r.ok || !data.success || !data.result) throw new Error(`turnstile API: HTTP ${r.status}`);
@@ -210,13 +210,19 @@ if (!turnstileSiteKey) {
   turnstileSecretKey = await ask("Turnstile secret key");
 }
 
+const turnstilePatched = patchTurnstileSiteKey(readFileSync(WRANGLER_JSONC, "utf8"), turnstileSiteKey);
+if (turnstilePatched.changed) {
+  writeFileSync(WRANGLER_JSONC, turnstilePatched.text);
+  needsRedeploy = true;
+  console.log("✓ TURNSTILE_SITE_KEY updated in wrangler.jsonc (will redeploy at the end)");
+}
+
 // ---------- Phase 5+6: session key + write all secrets ----------
 banner("Secrets");
 const secrets = buildSecretsJson({
   appId: appConfig.id,
   privateKeyPkcs8,
   webhookSecret: appConfig.webhook_secret,
-  turnstileSiteKey,
   turnstileSecretKey,
   sessionSigningKey: randomBytes(32).toString("hex"),
 });
@@ -239,6 +245,10 @@ try {
   }
 }
 console.log(`✓ ${Object.keys(secrets).length} secrets written`);
+try {
+  wrangler(["secret", "delete", "TURNSTILE_SITE_KEY"], { input: "y\n", quiet: true });
+  console.log("✓ Removed stale TURNSTILE_SITE_KEY secret; site key is now a public var");
+} catch { /* fresh setup or older Wrangler without the stale secret */ }
 
 // ---------- Phase 7: finalize ----------
 if (needsRedeploy) {

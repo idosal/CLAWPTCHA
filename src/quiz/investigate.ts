@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { ClawptchaConfig } from "../config";
+import type { VouchaConfig } from "../config";
 import type { PrContext } from "../challenge";
 import type { CompletionParams, CompletionResult, QuizProvider } from "./providers";
 
-const INVESTIGATION_SYSTEM_PROMPT = `You investigate GitHub pull requests for CLAWPTCHA.
+const INVESTIGATION_SYSTEM_PROMPT = `You investigate GitHub pull requests for VOUCHA.
 
 Your job is to understand the PR's intent, user/system behavior changes, affected surfaces,
 and review risk. Do NOT create code-trivia. Do NOT ask about function names, implementation
@@ -130,7 +130,7 @@ function rankedPatchFiles(ctx: PrContext) {
     });
 }
 
-export function investigationMode(ctx: PrContext, cfg: ClawptchaConfig): InvestigationArtifact["mode"] {
+export function investigationMode(ctx: PrContext, cfg: VouchaConfig): InvestigationArtifact["mode"] {
   const changedFiles = ctx.filePatches?.length ?? ctx.files.length;
   const changedLines = ctx.changedLines ?? 0;
   return (
@@ -139,7 +139,7 @@ export function investigationMode(ctx: PrContext, cfg: ClawptchaConfig): Investi
   ) ? "large_pr" : "normal";
 }
 
-export function buildInvestigationPrompt(ctx: PrContext, cfg: ClawptchaConfig): string {
+export function buildInvestigationPrompt(ctx: PrContext, cfg: VouchaConfig): string {
   const changedFiles = ctx.filePatches?.length ?? ctx.files.length;
   const changedLines = ctx.changedLines ?? 0;
   const mode = investigationMode(ctx, cfg);
@@ -213,7 +213,7 @@ function parseInvestigation(text: string, forcedMode: InvestigationArtifact["mod
 export async function investigatePr(
   provider: QuizProvider,
   ctx: PrContext,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   attempts = 2
 ): Promise<InvestigationResult> {
   const prompt = buildInvestigationPrompt(ctx, cfg);

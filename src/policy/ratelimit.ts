@@ -35,3 +35,31 @@ export async function checkAndRecordRate(
   ]);
   return { allowed: true };
 }
+
+// Per-IP cap on anonymous challenge-session creation. Every cookie-less visit
+// to a (public) challenge URL mints a `sessions` row; without a cap, a known
+// challenge id could be requested in a loop to grow that table. This bounds new
+// sessions per client IP within the same sliding window (reusing rate_events,
+// which the cron sweep already purges). Cloudflare edge limits sit in front of
+// this; it is a storage-amplification guard, not a hard security boundary, so
+// the same non-atomic check-then-insert caveat as above applies.
+export const SESSION_CREATE_LIMIT = 60;
+
+export async function allowSessionCreation(
+  db: D1Database,
+  clientIp: string,
+  now: Date
+): Promise<boolean> {
+  const since = new Date(now.getTime() - WINDOW_MS).toISOString();
+  const scope = `sess:${clientIp}`;
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM rate_events WHERE scope = ? AND created_at >= ?")
+    .bind(scope, since)
+    .first<{ n: number }>();
+  if ((row?.n ?? 0) >= SESSION_CREATE_LIMIT) return false;
+  await db
+    .prepare("INSERT INTO rate_events (scope, created_at) VALUES (?, ?)")
+    .bind(scope, now.toISOString())
+    .run();
+  return true;
+}

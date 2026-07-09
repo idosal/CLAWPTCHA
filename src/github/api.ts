@@ -1,7 +1,7 @@
 import type { RepositoryAccessDetails } from "./permissions";
 
 const API = "https://api.github.com";
-const COMMENT_MARKER = "<!-- clawptcha -->";
+const COMMENT_MARKER = "<!-- voucha -->";
 
 export interface CheckRunCreate {
   name: string;
@@ -61,9 +61,17 @@ export class GitHubApi {
     return {
       authorization: `Bearer ${this.token}`,
       accept,
-      "user-agent": "clawptcha",
+      "user-agent": "voucha",
       "x-github-api-version": "2022-11-28",
     };
+  }
+
+  // Encode each segment of an "owner/name" identifier before it goes into a
+  // path. Repo names from webhook payloads are already well-formed, but a repo
+  // parsed from untrusted input (e.g. a linked-issue reference in a PR body)
+  // could otherwise smuggle extra path segments ("../") into the API URL.
+  private repoPath(repo: string): string {
+    return repo.split("/").map(encodeURIComponent).join("/");
   }
 
   private async req(path: string, init: RequestInit = {}, accept?: string): Promise<Response> {
@@ -81,7 +89,7 @@ export class GitHubApi {
   }
 
   async createCheckRun(repo: string, check: CheckRunCreate): Promise<number> {
-    const res = await this.req(`/repos/${repo}/check-runs`, {
+    const res = await this.req(`/repos/${this.repoPath(repo)}/check-runs`, {
       method: "POST",
       body: JSON.stringify(check),
     });
@@ -90,28 +98,36 @@ export class GitHubApi {
   }
 
   async updateCheckRun(repo: string, checkRunId: number, patch: Partial<CheckRunCreate>): Promise<void> {
-    const res = await this.req(`/repos/${repo}/check-runs/${checkRunId}`, {
+    const res = await this.req(`/repos/${this.repoPath(repo)}/check-runs/${checkRunId}`, {
       method: "PATCH",
       body: JSON.stringify(patch),
     });
     if (!res.ok) throw new Error(`updateCheckRun ${res.status}: ${await res.text()}`);
   }
 
+  async closePullRequest(repo: string, prNumber: number): Promise<void> {
+    const res = await this.req(`/repos/${this.repoPath(repo)}/pulls/${prNumber}`, {
+      method: "PATCH",
+      body: JSON.stringify({ state: "closed" }),
+    });
+    if (!res.ok) throw new Error(`closePullRequest ${res.status}: ${await res.text()}`);
+  }
+
   async getCheckRun(repo: string, checkRunId: number): Promise<{ status: string; conclusion: string | null }> {
-    const res = await this.req(`/repos/${repo}/check-runs/${checkRunId}`);
+    const res = await this.req(`/repos/${this.repoPath(repo)}/check-runs/${checkRunId}`);
     if (!res.ok) throw new Error(`getCheckRun ${res.status}`);
     const data = (await res.json()) as { status: string; conclusion: string | null };
     return { status: data.status, conclusion: data.conclusion };
   }
 
   async getPrDiff(repo: string, prNumber: number): Promise<string> {
-    const res = await this.req(`/repos/${repo}/pulls/${prNumber}`, {}, "application/vnd.github.diff");
+    const res = await this.req(`/repos/${this.repoPath(repo)}/pulls/${prNumber}`, {}, "application/vnd.github.diff");
     if (!res.ok) throw new Error(`getPrDiff ${res.status}`);
     return res.text();
   }
 
   async getPr(repo: string, prNumber: number): Promise<PrDetails> {
-    const res = await this.req(`/repos/${repo}/pulls/${prNumber}`);
+    const res = await this.req(`/repos/${this.repoPath(repo)}/pulls/${prNumber}`);
     if (!res.ok) throw new Error(`getPr ${res.status}`);
     const p = (await res.json()) as any;
     return {
@@ -135,7 +151,7 @@ export class GitHubApi {
   async listPrFileDetails(repo: string, prNumber: number): Promise<PrFileDetails[]> {
     const files: PrFileDetails[] = [];
     for (let page = 1; ; page++) {
-      const res = await this.req(`/repos/${repo}/pulls/${prNumber}/files?per_page=100&page=${page}`);
+      const res = await this.req(`/repos/${this.repoPath(repo)}/pulls/${prNumber}/files?per_page=100&page=${page}`);
       if (!res.ok) throw new Error(`listPrFiles ${res.status}`);
       const batch = (await res.json()) as Array<{
         filename: string;
@@ -158,7 +174,7 @@ export class GitHubApi {
   }
 
   async getIssue(repo: string, issueNumber: number): Promise<IssueDetails | null> {
-    const res = await this.req(`/repos/${repo}/issues/${issueNumber}`);
+    const res = await this.req(`/repos/${this.repoPath(repo)}/issues/${issueNumber}`);
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`getIssue ${res.status}`);
     const issue = (await res.json()) as any;
@@ -178,7 +194,7 @@ export class GitHubApi {
   }
 
   async getFileContent(repo: string, path: string, ref: string): Promise<string | null> {
-    const res = await this.req(`/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`);
+    const res = await this.req(`/repos/${this.repoPath(repo)}/contents/${path}?ref=${encodeURIComponent(ref)}`);
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`getFileContent ${res.status}`);
     const data = (await res.json()) as { content: string };
@@ -189,12 +205,12 @@ export class GitHubApi {
   // One managed comment per PR, identified by COMMENT_MARKER.
   async upsertPrComment(repo: string, prNumber: number, body: string): Promise<void> {
     const full = `${COMMENT_MARKER}\n${body}`;
-    const listRes = await this.req(`/repos/${repo}/issues/${prNumber}/comments?per_page=100`);
+    const listRes = await this.req(`/repos/${this.repoPath(repo)}/issues/${prNumber}/comments?per_page=100`);
     if (listRes.ok) {
       const comments = (await listRes.json()) as Array<{ id: number; body: string }>;
       const mine = comments.find((c) => c.body.includes(COMMENT_MARKER));
       if (mine) {
-        const res = await this.req(`/repos/${repo}/issues/comments/${mine.id}`, {
+        const res = await this.req(`/repos/${this.repoPath(repo)}/issues/comments/${mine.id}`, {
           method: "PATCH",
           body: JSON.stringify({ body: full }),
         });
@@ -202,7 +218,7 @@ export class GitHubApi {
         return;
       }
     }
-    const res = await this.req(`/repos/${repo}/issues/${prNumber}/comments`, {
+    const res = await this.req(`/repos/${this.repoPath(repo)}/issues/${prNumber}/comments`, {
       method: "POST",
       body: JSON.stringify({ body: full }),
     });
@@ -210,7 +226,7 @@ export class GitHubApi {
   }
 
   async addLabels(repo: string, issueNumber: number, labels: string[]): Promise<void> {
-    const res = await this.req(`/repos/${repo}/issues/${issueNumber}/labels`, {
+    const res = await this.req(`/repos/${this.repoPath(repo)}/issues/${issueNumber}/labels`, {
       method: "POST",
       body: JSON.stringify({ labels }),
     });
@@ -219,11 +235,11 @@ export class GitHubApi {
 
   async ensureLabel(repo: string, name: string, color: string, description: string): Promise<void> {
     const encodedName = encodeURIComponent(name);
-    const existing = await this.req(`/repos/${repo}/labels/${encodedName}`);
+    const existing = await this.req(`/repos/${this.repoPath(repo)}/labels/${encodedName}`);
     if (existing.ok) return;
     if (existing.status !== 404) throw new Error(`ensureLabel GET ${existing.status}: ${await existing.text()}`);
 
-    const created = await this.req(`/repos/${repo}/labels`, {
+    const created = await this.req(`/repos/${this.repoPath(repo)}/labels`, {
       method: "POST",
       body: JSON.stringify({ name, color, description }),
     });
@@ -232,7 +248,7 @@ export class GitHubApi {
   }
 
   async getUserPermission(repo: string, username: string): Promise<RepositoryAccessDetails> {
-    const res = await this.req(`/repos/${repo}/collaborators/${encodeURIComponent(username)}/permission`);
+    const res = await this.req(`/repos/${this.repoPath(repo)}/collaborators/${encodeURIComponent(username)}/permission`);
     if (!res.ok) return { permission: "none", role_name: "none" };
     const data = (await res.json()) as { permission?: string; role_name?: string | null };
     return {

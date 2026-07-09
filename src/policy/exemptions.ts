@@ -1,4 +1,4 @@
-import type { ClawptchaConfig } from "../config";
+import type { VouchaConfig } from "../config";
 import type { RepositoryAccess } from "../github/permissions";
 import { matchRepositoryAccess } from "../github/permissions";
 
@@ -16,11 +16,11 @@ function normalizeAssociation(association: string): string {
   return association.trim().toUpperCase();
 }
 
-function defaultAuthorAssociations(cfg: ClawptchaConfig): Set<string> {
+function defaultAuthorAssociations(cfg: VouchaConfig): Set<string> {
   return new Set(cfg.trust.default_author_associations.map(normalizeAssociation));
 }
 
-function configuredAuthorAssociations(cfg: ClawptchaConfig): Set<string> {
+function configuredAuthorAssociations(cfg: VouchaConfig): Set<string> {
   const associations = new Set<string>();
   for (const exemption of cfg.exemptions) {
     if (exemption.type !== "author_association") continue;
@@ -35,7 +35,7 @@ function normalizeLogin(login: string): string {
   return login.trim().toLowerCase();
 }
 
-function configuredAuthorLogins(cfg: ClawptchaConfig): Set<string> {
+function configuredAuthorLogins(cfg: VouchaConfig): Set<string> {
   const logins = new Set<string>();
   for (const exemption of cfg.exemptions) {
     if (exemption.type !== "author_login") continue;
@@ -50,7 +50,7 @@ function normalizePermission(permission: string): string {
   return permission.trim().toLowerCase();
 }
 
-function configuredRepositoryPermissions(cfg: ClawptchaConfig): Set<string> {
+function configuredRepositoryPermissions(cfg: VouchaConfig): Set<string> {
   const permissions = new Set<string>();
   for (const exemption of cfg.exemptions) {
     if (exemption.type !== "repository_permission") continue;
@@ -61,7 +61,7 @@ function configuredRepositoryPermissions(cfg: ClawptchaConfig): Set<string> {
   return permissions;
 }
 
-function trustedBotLogins(cfg: ClawptchaConfig): Set<string> {
+function trustedBotLogins(cfg: VouchaConfig): Set<string> {
   return new Set(cfg.bot_policy.trusted_logins.map(normalizeLogin));
 }
 
@@ -78,13 +78,13 @@ function pathsMatchSome(files: string[], patterns: string[]): boolean {
 }
 
 function cloneConfigWithOverrides(
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   overrides: Partial<Pick<
-    ClawptchaConfig,
+    VouchaConfig,
     "gates" | "require_approval" | "max_attempts" | "cooldown_minutes" |
     "min_changed_lines" | "skip_paths" | "include_paths"
   >>
-): ClawptchaConfig {
+): VouchaConfig {
   return {
     ...cfg,
     gates: overrides.gates ? overrides.gates.map((gate) => ({ ...gate })) : cfg.gates.map((gate) => ({ ...gate })),
@@ -97,7 +97,7 @@ function cloneConfigWithOverrides(
   };
 }
 
-export function applyPathRules(cfg: ClawptchaConfig, changedFiles: string[]): ClawptchaConfig {
+export function applyPathRules(cfg: VouchaConfig, changedFiles: string[]): VouchaConfig {
   if (changedFiles.length === 0) return cfg;
   const rule = cfg.path_rules.find((candidate) => pathsMatchSome(changedFiles, candidate.paths));
   if (!rule) return cfg;
@@ -112,7 +112,7 @@ export function applyPathRules(cfg: ClawptchaConfig, changedFiles: string[]): Cl
   });
 }
 
-export function shouldRechallengeOnPush(cfg: ClawptchaConfig, changedFiles: string[]): boolean {
+export function shouldRechallengeOnPush(cfg: VouchaConfig, changedFiles: string[]): boolean {
   if (pathsMatchEvery(changedFiles, cfg.rechallenge.ignore_paths)) return false;
   if (cfg.rechallenge.on_push === "never") return false;
   if (cfg.rechallenge.on_push === "always") return true;
@@ -159,7 +159,7 @@ function segmentMatch(pat: string, s: string): boolean {
   return p === pat.length;
 }
 
-export function evaluateExemption(pr: PrFacts, cfg: ClawptchaConfig): ExemptionResult {
+export function evaluateExemption(pr: PrFacts, cfg: VouchaConfig): ExemptionResult {
   const authorAssociation = normalizeAssociation(pr.authorAssociation);
   if (cfg.skip_bots && pr.authorType === "Bot") {
     return { exempt: true, reason: "bot author" };
@@ -224,7 +224,7 @@ export interface PriorMergedPrsExemptionDeps {
 
 export async function evaluateRepositoryPermissionExemption(
   pr: RepositoryPermissionExemptionFacts,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   deps: RepositoryPermissionExemptionDeps
 ): Promise<ExemptionResult> {
   const configuredPermissions = configuredRepositoryPermissions(cfg);
@@ -261,7 +261,7 @@ function teamReference(repo: string, team: string): { org: string; slug: string;
 
 export async function evaluateGitHubTeamExemption(
   pr: RepositoryPermissionExemptionFacts,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   deps: GitHubTeamExemptionDeps
 ): Promise<ExemptionResult> {
   for (const exemption of cfg.exemptions) {
@@ -288,7 +288,7 @@ export async function evaluateGitHubTeamExemption(
 
 export async function evaluatePriorMergedPrsExemption(
   pr: RepositoryPermissionExemptionFacts,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   deps: PriorMergedPrsExemptionDeps
 ): Promise<ExemptionResult> {
   const thresholds = cfg.exemptions

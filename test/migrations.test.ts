@@ -7,7 +7,7 @@ describe("D1 migrations", () => {
       "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
     ).all<{ name: string }>();
     const names = results.map((r) => r.name);
-    for (const t of ["installations", "challenges", "quizzes", "sessions", "rate_events", "pr_investigations"]) {
+    for (const t of ["installations", "challenges", "quizzes", "sessions", "rate_events", "pr_investigations", "prepared_quizzes"]) {
       expect(names).toContain(t);
     }
   });

@@ -1,10 +1,10 @@
 - main [ref=f1e2] [box=0,0,1440,1426]:
   - generic [ref=f1e3] [box=0,0,1440,1426]:
     - navigation "Primary" [ref=f1e4] [box=160,0,1120,66]:
-      - link "CLAWPTCHA home" [ref=f1e5] [cursor=pointer] [box=160,15,149,34]:
+      - link "VOUCHA home" [ref=f1e5] [cursor=pointer] [box=160,15,149,34]:
         - /url: /
         - generic [ref=f1e6] [box=160,15,34,34]: C
-        - generic [ref=f1e7] [box=204,20,105,24]: CLAWPTCHA
+        - generic [ref=f1e7] [box=204,20,105,24]: VOUCHA
       - generic [ref=f1e8] [box=1120,21,160,23]:
         - link "Why" [ref=f1e9] [cursor=pointer] [box=1120,21,33,23]:
           - /url: "#why"
@@ -25,7 +25,7 @@
           - link "Use managed free" [ref=f1e18] [cursor=pointer] [box=160,468,181,44]:
             - /url: "#install"
           - link "Self-deploy" [ref=f1e19] [cursor=pointer] [box=351,468,129,44]:
-            - /url: https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA
+            - /url: https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/VOUCHA
       - complementary "GitHub Actions policy report example" [ref=f1e20] [box=850,110,430,454]:
         - text: Required
         - generic [ref=f1e21] [box=851,111,428,63]:
@@ -54,8 +54,8 @@
     - generic [ref=f1e62] [box=160,722,1120,623]:
       - generic [ref=f1e63] [box=160,762,696,125]:
         - heading "Keep the door open." [level=2] [ref=f1e64] [box=160,762,414,38]
-        - paragraph [ref=f1e65] [box=160,812,650,75]: CLAWPTCHA helps maintainers welcome real contributions without handing review time to contextless PRs. Gates ask for proof, issue-backed work gets trust, and challenge-assistance signals protect attestation.
-      - complementary "Install CLAWPTCHA" [ref=f1e66] [box=890,762,390,545]:
+        - paragraph [ref=f1e65] [box=160,812,650,75]: VOUCHA helps maintainers welcome real contributions without handing review time to contextless PRs. Gates ask for proof, issue-backed work gets trust, and challenge-assistance signals protect attestation.
+      - complementary "Install VOUCHA" [ref=f1e66] [box=890,762,390,545]:
         - heading "Run it your way" [level=3] [ref=f1e67] [box=908,780,354,26]
         - generic [ref=f1e68] [box=908,818,354,87]:
           - generic [ref=f1e69] [box=908,829,354,24]: Managed free
@@ -64,7 +64,7 @@
           - generic [ref=f1e72] [box=908,928,354,24]: Self-deploy
           - generic [ref=f1e73] [box=908,955,354,40]: Own the Worker, D1 database, GitHub App, and model provider.
         - link "Deploy to Cloudflare" [ref=f1e74] [cursor=pointer] [box=908,1017,354,44]:
-          - /url: https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA
+          - /url: https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/VOUCHA
         - paragraph [ref=f1e75] [box=908,1073,354,23]: "Self-deploy CLI path:"
         - code [ref=f1e76] [box=908,1107,354,44]: npx wrangler login && npm run setup
         - paragraph [ref=f1e77] [box=908,1164,354,23]:

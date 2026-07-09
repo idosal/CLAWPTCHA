@@ -1,10 +1,10 @@
 ---
 title: Policy evaluation
-description: How CLAWPTCHA loads repository policy and resolves accountability, gates, exemptions, and fail-open outcomes.
+description: How VOUCHA loads repository policy and resolves accountability, gates, exemptions, and fail-open outcomes.
 ---
 
-CLAWPTCHA evaluates repository policy before it asks an author to do anything.
-The policy file is read from `.github/clawptcha.yml` on the merge target, so a
+VOUCHA evaluates repository policy before it asks an author to do anything.
+The policy file is read from `.github/voucha.yml` on the merge target, so a
 pull request cannot relax its own gate by changing config in the same branch.
 
 Malformed fields fall back individually. A typo in one option should not take
@@ -98,7 +98,7 @@ exemptions:
     trusted_labels: [accepted]
 ```
 
-When an exemption matches, CLAWPTCHA posts a success check with the reason so
+When an exemption matches, VOUCHA posts a success check with the reason so
 maintainers can see why the author was not challenged.
 
 Owners, members, and collaborators are trusted by default through `trust`.
@@ -167,16 +167,27 @@ every challenged PR. `never` serves the challenge as soon as it is ready.
 Maintainers approve with a PR comment:
 
 ```text
-/clawptcha approve
+/voucha approve
 ```
 
 `max_attempts` and `cooldown_minutes` control retry behavior. A failed non-final
 attempt enters cooldown and generates a fresh quiz on retry. Once attempts are
-exhausted, the PR stays failed for maintainer review.
+exhausted, the PR stays failed for maintainer review by default.
+
+`enforcement.auto_close` can additionally close PRs after terminal hard-failure
+outcomes. It is off by default and never closes retryable failures, neutral
+service failures, or superseded challenges.
+
+```yaml
+enforcement:
+  auto_close:
+    enabled: true
+    outcomes: [failed_assisted, failed_final]
+```
 
 ## Output posture
 
-CLAWPTCHA reports through check runs first. `output.comments` controls PR
+VOUCHA reports through check runs first. `output.comments` controls PR
 comment volume:
 
 - `quiet`: check-run output only;

@@ -1,4 +1,5 @@
-import type { Challenge, ChallengeStatus, PrInvestigation } from "./types";
+import type { Challenge, ChallengeStatus, PrInvestigation, PreparedQuiz } from "./types";
+import type { Quiz } from "./quiz/schema";
 
 export function randomToken(bytes = 24): string {
   const buf = new Uint8Array(bytes);
@@ -128,6 +129,35 @@ export async function upsertInvestigation(
       investigation.artifact_json,
       investigation.error
     )
+    .run();
+}
+
+export async function getPreparedQuiz(
+  db: D1Database,
+  challengeId: string
+): Promise<PreparedQuiz | null> {
+  return db.prepare(
+    "SELECT challenge_id, questions_json, created_at, updated_at FROM prepared_quizzes WHERE challenge_id=?"
+  ).bind(challengeId).first<PreparedQuiz>();
+}
+
+export async function upsertPreparedQuiz(
+  db: D1Database,
+  challengeId: string,
+  quiz: Quiz
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO prepared_quizzes (challenge_id, questions_json)
+     VALUES (?, ?)
+     ON CONFLICT(challenge_id) DO UPDATE SET
+       questions_json=excluded.questions_json,
+       updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+  ).bind(challengeId, JSON.stringify(quiz)).run();
+}
+
+export async function deletePreparedQuiz(db: D1Database, challengeId: string): Promise<void> {
+  await db.prepare("DELETE FROM prepared_quizzes WHERE challenge_id=?")
+    .bind(challengeId)
     .run();
 }
 

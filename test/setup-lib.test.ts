@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
-import { buildManifest, buildSecretsJson, manifestFormHtml, parseDeployedUrl, patchAppBaseUrl, pkcs1ToPkcs8 } from "../scripts/setup-lib.mts";
+import { buildManifest, buildSecretsJson, manifestFormHtml, parseDeployedUrl, patchAppBaseUrl, patchTurnstileSiteKey, pkcs1ToPkcs8 } from "../scripts/setup-lib.mts";
 
 describe("buildManifest", () => {
   const m = buildManifest({
-    appName: "clawptcha-test",
-    baseUrl: "https://clawptcha.example.workers.dev",
+    appName: "voucha-test",
+    baseUrl: "https://voucha.example.workers.dev",
     redirectUrl: "http://localhost:8976/callback",
   });
 
   it("sets urls derived from the base url", () => {
-    expect(m.url).toBe("https://clawptcha.example.workers.dev");
-    expect(m.hook_attributes).toEqual({ url: "https://clawptcha.example.workers.dev/webhook" });
+    expect(m.url).toBe("https://voucha.example.workers.dev");
+    expect(m.hook_attributes).toEqual({ url: "https://voucha.example.workers.dev/webhook" });
     expect(m).not.toHaveProperty("callback_urls");
     expect(m.redirect_url).toBe("http://localhost:8976/callback");
   });
@@ -43,15 +43,15 @@ describe("manifestFormHtml", () => {
 
 describe("parseDeployedUrl", () => {
   it("finds the workers.dev url in wrangler deploy output", () => {
-    const out = "Uploaded clawptcha (3.2 sec)\nDeployed clawptcha triggers (1.1 sec)\n  https://clawptcha.someone.workers.dev\nCurrent Version ID: abc";
-    expect(parseDeployedUrl(out)).toBe("https://clawptcha.someone.workers.dev");
+    const out = "Uploaded voucha (3.2 sec)\nDeployed voucha triggers (1.1 sec)\n  https://voucha.someone.workers.dev\nCurrent Version ID: abc";
+    expect(parseDeployedUrl(out)).toBe("https://voucha.someone.workers.dev");
   });
   it("returns null when absent", () => {
     expect(parseDeployedUrl("nothing here")).toBeNull();
   });
   it("prefers the last workers.dev url when several appear", () => {
-    const out = "preview: https://abc-preview.someone.workers.dev\nDeployed\n  https://clawptcha.someone.workers.dev";
-    expect(parseDeployedUrl(out)).toBe("https://clawptcha.someone.workers.dev");
+    const out = "preview: https://abc-preview.someone.workers.dev\nDeployed\n  https://voucha.someone.workers.dev";
+    expect(parseDeployedUrl(out)).toBe("https://voucha.someone.workers.dev");
   });
 });
 
@@ -59,7 +59,7 @@ describe("patchAppBaseUrl", () => {
   const jsonc = `{
   // comment survives
   "vars": {
-    "APP_BASE_URL": "https://clawptcha.example.workers.dev",
+    "APP_BASE_URL": "https://voucha.example.workers.dev",
     "LLM_PROVIDER": "workers-ai"
   }
 }`;
@@ -71,12 +71,44 @@ describe("patchAppBaseUrl", () => {
     expect(r.text).toContain('"LLM_PROVIDER": "workers-ai"');
   });
   it("reports unchanged when the value already matches", () => {
-    const r = patchAppBaseUrl(jsonc, "https://clawptcha.example.workers.dev");
+    const r = patchAppBaseUrl(jsonc, "https://voucha.example.workers.dev");
     expect(r.changed).toBe(false);
     expect(r.text).toBe(jsonc);
   });
   it("throws when the key is missing", () => {
     expect(() => patchAppBaseUrl("{}", "https://x")).toThrow(/APP_BASE_URL/);
+  });
+});
+
+describe("patchTurnstileSiteKey", () => {
+  const jsonc = `{
+  "vars": {
+    "APP_BASE_URL": "https://voucha.example.workers.dev",
+    "LLM_PROVIDER": "workers-ai"
+  }
+}`;
+
+  it("adds the public site key next to APP_BASE_URL", () => {
+    const r = patchTurnstileSiteKey(jsonc, "0xSITE");
+    expect(r.changed).toBe(true);
+    expect(r.text).toContain('"APP_BASE_URL": "https://voucha.example.workers.dev",');
+    expect(r.text).toContain('"TURNSTILE_SITE_KEY": "0xSITE",');
+    expect(r.text).toContain('"LLM_PROVIDER": "workers-ai"');
+  });
+
+  it("updates an existing public site key", () => {
+    const withKey = patchTurnstileSiteKey(jsonc, "0xOLD").text;
+    const r = patchTurnstileSiteKey(withKey, "0xNEW");
+    expect(r.changed).toBe(true);
+    expect(r.text).toContain('"TURNSTILE_SITE_KEY": "0xNEW"');
+    expect(r.text).not.toContain("0xOLD");
+  });
+
+  it("reports unchanged when the public site key already matches", () => {
+    const withKey = patchTurnstileSiteKey(jsonc, "0xSITE").text;
+    const r = patchTurnstileSiteKey(withKey, "0xSITE");
+    expect(r.changed).toBe(false);
+    expect(r.text).toBe(withKey);
   });
 });
 
@@ -106,12 +138,11 @@ describe("pkcs1ToPkcs8", () => {
 });
 
 describe("buildSecretsJson", () => {
-  it("assembles exactly the 6 workers-ai-path secrets", () => {
+  it("assembles exactly the 5 workers-ai-path secrets", () => {
     const s = buildSecretsJson({
       appId: 123,
       privateKeyPkcs8: `${pkcs8Begin}\nx\n${pkcs8End}`,
       webhookSecret: "wh",
-      turnstileSiteKey: "0xSITE",
       turnstileSecretKey: "0xSECRET",
       sessionSigningKey: "a".repeat(64),
     });
@@ -121,7 +152,6 @@ describe("buildSecretsJson", () => {
       "GITHUB_WEBHOOK_SECRET",
       "SESSION_SIGNING_KEY",
       "TURNSTILE_SECRET_KEY",
-      "TURNSTILE_SITE_KEY",
     ]);
     expect(s.GITHUB_APP_ID).toBe("123");
     expect(s.GITHUB_PRIVATE_KEY).toContain(pkcs8Marker);

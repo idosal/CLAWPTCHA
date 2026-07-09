@@ -4,7 +4,7 @@
 //
 // Usage:
 //   node scripts/localdev/seed-demo.mjs [quizJsonPath] > /tmp/seed.sql
-//   # then: npx wrangler d1 execute clawptcha --local --file /tmp/seed.sql
+//   # then: npx wrangler d1 execute voucha --local --file /tmp/seed.sql
 //   # the signed cookie + ids are printed to stderr.
 //
 // SESSION_SIGNING_KEY must match .dev.vars (default below matches the sample).
@@ -43,7 +43,7 @@ process.stdout.write(
 process.stderr.write(
   `\nchallengeId: ${cid}\nquizId:      ${qid}\nauthor:      ${author}\n` +
   `Cookie header for curl / browser:\n` +
-  `  clawptcha_session=${cookie}; clawptcha_quiz=${qid}\n\n` +
+  `  voucha_session=${cookie}; voucha_quiz=${qid}\n\n` +
   `Drive it:\n` +
-  `  curl -s localhost:8787/challenge/${cid}/question -H "Cookie: clawptcha_session=${cookie}; clawptcha_quiz=${qid}"\n`
+  `  curl -s localhost:8787/challenge/${cid}/question -H "Cookie: voucha_session=${cookie}; voucha_quiz=${qid}"\n`
 );

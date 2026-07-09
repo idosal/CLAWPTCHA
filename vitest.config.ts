@@ -58,8 +58,12 @@ export default defineConfig(async () => {
   // truth and the test config can never drift from it.
   const config = JSON.parse(
     stripJsonComments(fs.readFileSync(path.join(__dirname, "wrangler.jsonc"), "utf8"))
-  ) as { main: string; d1_databases: Array<Record<string, unknown>> };
+  ) as { main: string; d1_databases: Array<Record<string, unknown>>; services?: unknown };
   config.d1_databases[0].database_id = "00000000-0000-0000-0000-000000000000";
+  // The deployed Worker binds the optional Flue investigator service, but the
+  // local test pool does not spin up that sibling Worker. Tests that need Flue
+  // exercise the integration directly with mocked fetchers.
+  delete config.services;
   // Relative paths in a wrangler config resolve against the config file's
   // directory; the generated file lives in .wrangler/tmp/, so make main absolute.
   config.main = path.resolve(__dirname, config.main);

@@ -7,7 +7,7 @@ Passive signals are usually evidence, not verdicts. They are collected so
 maintainers can notice suspicious automation patterns without letting a brittle
 signal silently block a contributor.
 
-CLAWPTCHA keeps passive signals out of challenge scoring. They can appear in
+VOUCHA keeps passive signals out of challenge scoring. They can appear in
 check-run summaries, risk reports, comments, and flagged labels, but they do
 not turn a correct quiz into a failure.
 
@@ -22,7 +22,7 @@ their reason.
 form fillers often populate hidden fields. Real authors and browser password
 managers generally should not.
 
-When the field is submitted, CLAWPTCHA records the hit in challenge telemetry
+When the field is submitted, VOUCHA records the hit in challenge telemetry
 and surfaces it in review summaries. The hit does not change the quiz score.
 
 ```yaml
@@ -45,7 +45,7 @@ source.
 signals:
   - type: code_honeypot
     report_only: true
-    patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"]
+    patterns: ["VOUCHA_DO_NOT_ADD_THIS"]
     paths: ["src/**", "infra/**"]
 ```
 
@@ -74,13 +74,13 @@ Those summaries are only collected after the contributor accepts the challenge
 terms on the start page. See [Privacy and data](/docs/privacy-data/) for the
 full data boundary.
 
-CLAWPTCHA treats two or more independent unusual signals as automation-likely
+VOUCHA treats two or more independent unusual signals as automation-likely
 for reporting purposes. A single signal is intentionally not enough: keyboard
 navigation, browser extensions, network issues, and accessibility setups can
 look unusual without implying bad faith.
 
 When a quiz passes but the risk report is automation-likely, the check title
-calls that out. If `output.labels: true`, CLAWPTCHA also best-effort creates
+calls that out. If `output.labels: true`, VOUCHA also best-effort creates
 and applies `pr-comprehension:flagged`.
 
 ## Why report-only

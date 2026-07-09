@@ -15,7 +15,7 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
     getPr: vi.fn(async (): Promise<PrDetails> => pr),
     listPrFiles: vi.fn(async () => ["src/app.ts"]),
     getIssue: vi.fn(async () => null),
-    getFileContent: vi.fn(async () => null), // no clawptcha.yml → defaults
+    getFileContent: vi.fn(async () => null), // no voucha.yml → defaults
     upsertPrComment: vi.fn(async () => {}),
     getUserPermission: vi.fn(async () => "none"),
     getTeamMembership: vi.fn(async () => null),
@@ -34,7 +34,7 @@ const codeHoneypotYaml = [
   "signals:",
   "  - type: code_honeypot",
   "    patterns:",
-  "      - CLAWPTCHA_DO_NOT_ADD_THIS",
+  "      - VOUCHA_DO_NOT_ADD_THIS",
   "    paths:",
   "      - '**'",
   "",
@@ -43,7 +43,7 @@ const codeHoneypotYaml = [
 const codeHoneypotDiff = [
   "diff --git a/src/app.ts b/src/app.ts",
   "+++ b/src/app.ts",
-  "+const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+  "+const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
   "",
 ].join("\n");
 
@@ -524,12 +524,12 @@ describe("handlePullRequestEvent", () => {
     expect(await getChallengeByPr(testEnv.DB, "o/r", n, "sha2")).not.toBeNull();
   });
 
-  it("reads clawptcha.yml from the base ref, not the PR head or stale base SHA", async () => {
+  it("reads voucha.yml from the base ref, not the PR head or stale base SHA", async () => {
     const getFileContent = vi.fn(async () => null);
     const api = stubApi({ getFileContent });
     const n = uniq + 8;
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
-    expect(getFileContent).toHaveBeenCalledWith("o/r", ".github/clawptcha.yml", "main");
+    expect(getFileContent).toHaveBeenCalledWith("o/r", ".github/voucha.yml", "main");
   });
 
   it("supersedes an open challenge when a new sha arrives", async () => {
@@ -587,12 +587,38 @@ describe("handleIssueCommentEvent", () => {
       installation: { id: 1 },
       repository: { full_name: "o/r" },
       issue: { number: n, pull_request: {} },
-      comment: { body: "/clawptcha verify ABC123", user: { login: "contributor" } },
+      comment: { body: "/voucha verify ABC123", user: { login: "contributor" } },
     });
 
     const row = await testEnv.DB.prepare("SELECT gh_login, verify_code FROM sessions WHERE id='sessVerify'")
       .first<{ gh_login: string | null; verify_code: string | null }>();
     expect(row).toEqual({ gh_login: "contributor", verify_code: null });
+  });
+
+  it("starts quiz preparation after a ready challenge verification comment binds", async () => {
+    const api = stubApi({
+      getPr: vi.fn(async () => ({ ...pr, author_association: "CONTRIBUTOR" })),
+    });
+    const n = uniq + 30;
+    const p = payloadFor(n);
+    p.pull_request.author_association = "CONTRIBUTOR";
+    await handlePullRequestEvent(testEnv, api, p);
+    const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    expect(ch?.status).toBe("ready");
+    await testEnv.DB.prepare(
+      "INSERT INTO sessions (id, challenge_id, verify_code) VALUES ('sessPrepare', ?, 'beef42')"
+    ).bind(ch!.id).run();
+    const prepareQuiz = vi.fn(async () => {});
+
+    await handleIssueCommentEvent(testEnv, api, {
+      action: "created",
+      installation: { id: 1 },
+      repository: { full_name: "o/r" },
+      issue: { number: n, pull_request: {} },
+      comment: { body: "/voucha verify beef42", user: { login: "contributor" } },
+    }, { prepareQuiz });
+
+    expect(prepareQuiz).toHaveBeenCalledWith(expect.objectContaining({ id: ch!.id }));
   });
 
   it("ignores verification comments from anyone other than the PR author", async () => {
@@ -610,7 +636,7 @@ describe("handleIssueCommentEvent", () => {
       installation: { id: 1 },
       repository: { full_name: "o/r" },
       issue: { number: n, pull_request: {} },
-      comment: { body: "/clawptcha verify def456", user: { login: "rando" } },
+      comment: { body: "/voucha verify def456", user: { login: "rando" } },
     });
 
     const row = await testEnv.DB.prepare("SELECT gh_login, verify_code FROM sessions WHERE id='sessWrongAuthor'")
@@ -618,7 +644,7 @@ describe("handleIssueCommentEvent", () => {
     expect(row).toEqual({ gh_login: null, verify_code: "def456" });
   });
 
-  it("approves the newest challenge on '/clawptcha approve' from a maintainer", async () => {
+  it("approves the newest challenge on '/voucha approve' from a maintainer", async () => {
     const api = stubApi();
     const n = uniq + 6;
     await handlePullRequestEvent(testEnv, api, payloadFor(n));
@@ -628,7 +654,7 @@ describe("handleIssueCommentEvent", () => {
       installation: { id: 1 },
       repository: { full_name: "o/r" },
       issue: { number: n, pull_request: {} },
-      comment: { body: "/clawptcha approve", user: { login: "maintainer" } },
+      comment: { body: "/voucha approve", user: { login: "maintainer" } },
     });
     const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
     expect(ch?.status).toBe("ready");
@@ -644,7 +670,7 @@ describe("handleIssueCommentEvent", () => {
       installation: { id: 1 },
       repository: { full_name: "o/r" },
       issue: { number: n, pull_request: {} },
-      comment: { body: "/clawptcha approve", user: { login: "rando" } },
+      comment: { body: "/voucha approve", user: { login: "rando" } },
     });
     const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
     expect(ch?.status).toBe("awaiting_approval");

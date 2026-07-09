@@ -37,7 +37,30 @@ const largeCtx = {
   }],
 };
 
+const normalCtx = {
+  ...largeCtx,
+  changedLines: DEFAULT_CONFIG.context.large_pr.changed_lines - 1,
+  filePatches: [{
+    filename: "src/infra/clawhub.ts",
+    status: "modified",
+    additions: 3,
+    deletions: 1,
+    changes: 4,
+    patch: "+small targeted change",
+  }],
+};
+
 describe("chooseInvestigatorSource", () => {
+  it("keeps normal PRs on the worker investigator even when Flue is configured", () => {
+    expect(chooseInvestigatorSource({
+      FLUE_INVESTIGATOR: { fetch: vi.fn() } as unknown as Fetcher,
+    }, DEFAULT_CONFIG, normalCtx)).toEqual({
+      ok: true,
+      source: "worker",
+      mode: "normal",
+    });
+  });
+
   it("uses Flue automatically for large PRs when the service binding is configured", () => {
     expect(chooseInvestigatorSource({
       FLUE_INVESTIGATOR: { fetch: vi.fn() } as unknown as Fetcher,
@@ -76,7 +99,7 @@ describe("investigatePrWithFlue", () => {
     expect(serviceFetch).toHaveBeenCalledTimes(1);
     const calls = serviceFetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit]>;
     const [url, init] = calls[0]!;
-    expect(String(url)).toBe("https://clawptcha-flue-investigator/workflows/investigate-pr?wait=result");
+    expect(String(url)).toBe("https://voucha-flue-investigator/workflows/investigate-pr?wait=result");
     expect(init.headers).toMatchObject({
       "content-type": "application/json",
     });

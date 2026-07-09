@@ -1,31 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
-  <title id="title">VOUCHA favicon for dark mode</title>
-  <desc id="desc">A block V made from outlined challenge tiles with code-diff and pull-request symbols.</desc>
+  <title id="title">VOUCHA logo mark</title>
+  <desc id="desc">A block V made from challenge tiles with code-diff and pull-request symbols.</desc>
   <defs>
     <style>
-      .ink {
-        fill: #101816;
-        stroke: #edf6ec;
-        stroke-width: 3;
-        vector-effect: non-scaling-stroke;
-      }
-      .brand {
-        fill: #ff6f4d;
-        stroke: #edf6ec;
-        stroke-width: 3;
-        vector-effect: non-scaling-stroke;
-      }
+      .ink { fill: #101816; }
+      .brand { fill: #ff6f4d; }
       .symbol {
         fill: none;
         stroke: #d8f35f;
         stroke-width: 8;
         stroke-linecap: round;
         stroke-linejoin: round;
-      }
-      .dot {
-        fill: #ff6f4d;
-        stroke: #d8f35f;
-        stroke-width: 5;
       }
     </style>
   </defs>
@@ -38,8 +23,8 @@
     <path class="symbol" d="M45 51h16" />
     <path class="symbol" d="M187 43v16M179 51h16" />
     <path class="symbol" d="M112 191h16m0 0 10-9m-10 9 10 9" />
-    <circle class="dot" cx="112" cy="191" r="4" />
-    <circle class="dot" cx="138" cy="182" r="4" />
-    <circle class="dot" cx="138" cy="200" r="4" />
+    <circle cx="112" cy="191" r="4" fill="#ff6f4d" stroke="#d8f35f" stroke-width="5" />
+    <circle cx="138" cy="182" r="4" fill="#ff6f4d" stroke="#d8f35f" stroke-width="5" />
+    <circle cx="138" cy="200" r="4" fill="#ff6f4d" stroke="#d8f35f" stroke-width="5" />
   </g>
 </svg>

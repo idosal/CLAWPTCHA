@@ -18,6 +18,13 @@ export interface QuizProvider {
   complete(params: CompletionParams): Promise<CompletionResult>;
 }
 
+function jsonSchemaResponseFormat(name: string, schema: object) {
+  return {
+    type: "json_schema",
+    json_schema: { name, schema, strict: true },
+  };
+}
+
 function errMsg(prefix: string, e: unknown): { ok: false; error: string } {
   return { ok: false, error: `${prefix}: ${e instanceof Error ? e.message : String(e)}` };
 }
@@ -74,10 +81,7 @@ export function openAiCompatProvider(
               { role: "system", content: system },
               { role: "user", content: prompt },
             ],
-            response_format: {
-              type: "json_schema",
-              json_schema: { name: "quiz", schema, strict: true },
-            },
+            response_format: jsonSchemaResponseFormat("quiz", schema),
           }),
         });
         if (!res.ok) return { ok: false, error: `openai-compat: HTTP ${res.status}` };
@@ -109,7 +113,7 @@ export function workersAiProvider(ai: Ai, model: string, gatewayId?: string): Qu
               { role: "user", content: prompt },
             ],
             max_tokens: maxTokens,
-            response_format: { type: "json_schema", json_schema: schema },
+            response_format: jsonSchemaResponseFormat("quiz", schema),
           } as Parameters<Ai["run"]>[1],
           options
         )) as { response?: string; choices?: Array<{ message?: { content?: string } }> };

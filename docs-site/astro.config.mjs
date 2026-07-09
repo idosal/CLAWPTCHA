@@ -6,30 +6,30 @@ export default defineConfig({
   publicDir: "./docs-site/public",
   outDir: "./public/docs",
   base: "/docs",
-  site: "https://clawptcha.dev",
+  site: "https://voucha.dev",
   trailingSlash: "always",
   build: {
     format: "directory",
   },
   integrations: [
     starlight({
-      title: "CLAWPTCHA Docs",
-      description: "Repository policy, triage, passive signals, and challenge operations for CLAWPTCHA.",
+      title: "VOUCHA Docs",
+      description: "Repository policy, triage, passive signals, and challenge operations for VOUCHA.",
       customCss: ["/docs-site/src/styles/starlight.css"],
       editLink: {
-        baseUrl: "https://github.com/idosal/CLAWPTCHA/edit/main/",
+        baseUrl: "https://github.com/idosal/VOUCHA/edit/main/",
       },
       lastUpdated: true,
       pagefind: false,
       social: [
-        { icon: "github", label: "GitHub", href: "https://github.com/idosal/CLAWPTCHA" },
+        { icon: "github", label: "GitHub", href: "https://github.com/idosal/VOUCHA" },
       ],
       sidebar: [
         {
           label: "Start",
           items: [
             { label: "Overview", slug: "index" },
-            { label: "Why use CLAWPTCHA", slug: "why-clawptcha" },
+            { label: "Why use VOUCHA", slug: "why-voucha" },
             { label: "Getting started", slug: "getting-started" },
             { label: "Deployment", slug: "deployment" },
           ],

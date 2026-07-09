@@ -18,18 +18,18 @@ const question = {
 
 describe("challenge pages", () => {
   it("renders the public website with install and product framing", () => {
-    const html = homePage("https://clawptcha.example.com");
+    const html = homePage("https://voucha.example.com");
 
     expect(html).toContain("<h1 id=\"home-title\">Say yes to <br>contributions.</h1>");
     expect(html).toContain("A policy layer for GitHub pull requests.");
-    expect(html).toContain("CLAWPTCHA allows contributors to prove their understanding and intent.");
+    expect(html).toContain("VOUCHA allows contributors to prove their understanding and intent in an interactive app.");
     expect(html).toContain("complements code review, CI, tests, and branch protection");
-    expect(html).toContain('<link rel="canonical" href="https://clawptcha.example.com">');
-    expect(html).toContain('<meta property="og:image" content="https://clawptcha.example.com/clawptcha-social-card.png">');
+    expect(html).toContain('<link rel="canonical" href="https://voucha.example.com">');
+    expect(html).toContain('<meta property="og:image" content="https://voucha.example.com/voucha-social-card.png">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain('<meta property="og:image:width" content="1200">');
     expect(html).toContain('<meta property="og:image:height" content="630">');
-    expect(html).toContain('<source media="(prefers-color-scheme: dark)" srcset="/clawptcha-logo-dark.svg">');
+    expect(html).toContain('<source media="(prefers-color-scheme: dark)" srcset="/voucha-logo-dark.svg">');
     expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon-dark.svg" media="(prefers-color-scheme: dark)">');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon-dark.png" media="(prefers-color-scheme: dark)">');
     expect(html).toContain("Deploy to Cloudflare");
@@ -39,9 +39,9 @@ describe("challenge pages", () => {
     expect(html).toContain("Screen the PR");
     expect(html).toContain("Review the record");
     expect(html).toContain('href="/docs/"');
-    expect(html).toContain('href="https://github.com/apps/clawptcha/installations/new"');
+    expect(html).toContain('href="https://github.com/apps/voucha-app/installations/new"');
     expect(html).not.toContain("Open the Starlight docs");
-    expect(html).not.toContain("CLAWPATCHA");
+    expect(html).not.toContain("VOUCHAA");
     expect(html).toContain("short configurable tests scoped to the diff");
     expect(html).not.toContain("Team exemptions require GitHub Members read permission");
     expect(html).not.toContain("contributor-accepted answers");
@@ -58,6 +58,10 @@ describe("challenge pages", () => {
     expect(start).toContain("I understand what will be posted.");
     expect(start).toContain("post the result to the PR");
     expect(start).toContain("/docs/privacy-data/");
+    expect(start).toContain("Preparing the quiz");
+    expect(start).toContain("Reading the pull request");
+    expect(start).toContain("Generating PR-specific questions");
+    expect(start).toContain("First runs and larger diffs can take a little longer.");
     expect(questionHtml).toContain(`name="${HONEYPOT_FIELD_NAME}"`);
     expect(questionHtml).toContain('tabindex="-1"');
     expect(start).toContain("Bot verification failures stop the challenge");
@@ -70,8 +74,11 @@ describe("challenge pages", () => {
     const html = verificationPage("o/r#1", "alice", "challenge-id", "abc123", "https://github.com/o/r/pull/1#issuecomment-new");
 
     expect(html).toContain("Verify from the PR.");
-    expect(html).toContain("/clawptcha verify abc123");
+    expect(html).toContain("/voucha verify abc123");
     expect(html).toContain("Copy and open PR");
+    expect(html).toContain('id="copyCommandButton"');
+    expect(html).toContain('aria-label="Copy verification command"');
+    expect(html).toContain(">Copy</button>");
     expect(html).toContain('id="openPrLink"');
     expect(html).toContain("Open PR");
     expect(html).toContain("Waiting for your GitHub comment.");
@@ -80,7 +87,7 @@ describe("challenge pages", () => {
     expect(html).toContain("never receives a GitHub user token");
     expect(html).toContain("cannot comment, approve, or answer on your behalf");
     expect(html).toContain('action="/challenge/challenge-id/verify"');
-    expect(html).toContain("Copy failed. Select the command above, then use Open PR");
+    expect(html).toContain("Copy failed. The command text is selected; copy it manually, then use Open PR");
   });
 
   it("renders terminal page actions back to the PR and challenge", () => {

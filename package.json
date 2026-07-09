@@ -1,13 +1,13 @@
 {
-  "name": "clawptcha",
+  "name": "voucha",
   "version": "0.1.0",
   "description": "GitHub PR comprehension checks for maintainers.",
   "license": "MIT",
   "private": true,
-  "homepage": "https://clawptcha.dev",
+  "homepage": "https://voucha.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/idosal/CLAWPTCHA.git"
+    "url": "https://github.com/idosal/VOUCHA.git"
   },
   "keywords": [
     "github-app",

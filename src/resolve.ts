@@ -1,5 +1,6 @@
 import type { Env, Challenge } from "./types";
 import type { ResolvedChallenge } from "./challenge";
+import { resolveConfig, shouldAutoClosePr, type VouchaConfig } from "./config";
 import { GitHubApi } from "./github/api";
 import { getInstallationToken } from "./github/auth";
 import { buildRiskReport, renderRiskReportMarkdown } from "./risk/report";
@@ -10,6 +11,55 @@ const FLAGGED_LABEL_DESCRIPTION = "Multiple passive risk signals were observed o
 
 function challengeUrl(env: Env, challengeId: string): string {
   return `${env.APP_BASE_URL}/challenge/${challengeId}`;
+}
+
+type AutoCloseResult = "not_configured" | "closed" | "failed";
+
+async function maybeAutoClosePr(
+  api: GitHubApi,
+  challenge: Challenge,
+  cfg: VouchaConfig,
+  outcome: string
+): Promise<AutoCloseResult> {
+  if (!shouldAutoClosePr(cfg, outcome)) return "not_configured";
+  try {
+    await api.closePullRequest(challenge.repo_full_name, challenge.pr_number);
+    return "closed";
+  } catch (err) {
+    console.error("auto-close pull request failed", {
+      challengeId: challenge.id,
+      repo: challenge.repo_full_name,
+      prNumber: challenge.pr_number,
+      outcome,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return "failed";
+  }
+}
+
+function autoCloseCheckLine(result: AutoCloseResult): string | null {
+  if (result === "closed") {
+    return "Repository policy auto-closed this pull request. Maintainers can reopen it after manual review.";
+  }
+  if (result === "failed") {
+    return "Repository policy is configured to auto-close this pull request, but VOUCHA could not close it. Maintainers should review manually.";
+  }
+  return null;
+}
+
+function withAutoCloseCheckLine(summary: string, result: AutoCloseResult): string {
+  const line = autoCloseCheckLine(result);
+  return line ? `${summary}\n\n${line}` : summary;
+}
+
+function maintainerActionLine(result: AutoCloseResult): string {
+  if (result === "closed") {
+    return "Repository policy auto-closed this PR. Maintainers can reopen it after manual review.";
+  }
+  if (result === "failed") {
+    return "Repository policy is configured to auto-close this PR, but VOUCHA could not close it. Maintainers: please review manually before merging.";
+  }
+  return "Maintainers: please review this PR manually before merging.";
 }
 
 export async function apiForInstallation(env: Env, installationId: number): Promise<GitHubApi> {
@@ -53,7 +103,7 @@ export async function onChallengeResolved(
       }
       if (commentsEnabled) {
         await api.upsertPrComment(repo, pr, [
-          "## Clawptcha — passed",
+          "## VOUCHA — passed",
           "",
           `@${r.challenge.author_login} certified under challenge that they personally understand this change (score ${r.score}/${r.total}).`,
           "",
@@ -79,7 +129,7 @@ export async function onChallengeResolved(
       });
       if (commentsEnabled) {
         await api.upsertPrComment(repo, pr, [
-          "## Clawptcha — retry needed",
+          "## VOUCHA — retry needed",
           "",
           `@${r.challenge.author_login} did not pass attempt ${r.challenge.attempts_used}/${r.cfg.max_attempts} (score ${r.score}/${r.total}).`,
           "",
@@ -92,22 +142,26 @@ export async function onChallengeResolved(
     }
     case "failed_assisted": {
       const reasonLine = r.failureReason ? `Reason: ${r.failureReason}\n\n` : "";
+      const autoClose = await maybeAutoClosePr(api, r.challenge, r.cfg, r.outcome);
       if (checkId) await api.updateCheckRun(repo, checkId, {
         status: "completed", conclusion: "failure",
         details_url: url,
         output: {
           title: "Failed — challenge assistance detected",
-          summary: `${reasonLine}Score ${r.score}/${r.total}. This challenge must be answered from the author's own understanding.\n\n${riskMd}`,
+          summary: `${withAutoCloseCheckLine(
+            `${reasonLine}Score ${r.score}/${r.total}. This challenge must be answered from the author's own understanding.`,
+            autoClose
+          )}\n\n${riskMd}`,
         },
       });
       if (commentsEnabled) {
         await api.upsertPrComment(repo, pr, [
-          "## Clawptcha — challenge failed",
+          "## VOUCHA — challenge failed",
           "",
           `@${r.challenge.author_login} answered the challenge in a way that showed automation or outside assistance.`,
           ...(r.failureReason ? ["", `Reason: ${r.failureReason}`] : []),
           "",
-          "Maintainers: please review this PR manually before merging.",
+          maintainerActionLine(autoClose),
           ...(detailedComments ? ["", riskMd] : []),
         ].join("\n"));
       }
@@ -116,24 +170,28 @@ export async function onChallengeResolved(
     case "failed_final": {
       const title = r.failureReason ? "Failed — bot verification" : "Failed — attempts exhausted";
       const reasonLine = r.failureReason ? `Reason: ${r.failureReason}\n\n` : "";
+      const autoClose = await maybeAutoClosePr(api, r.challenge, r.cfg, r.outcome);
       if (checkId) await api.updateCheckRun(repo, checkId, {
         status: "completed", conclusion: "failure",
         details_url: url,
         output: {
           title,
-          summary: `${reasonLine}Score ${r.score}/${r.total}. ${r.failureReason ? "Bot verification did not pass." : "Max attempts reached."}\n\n${riskMd}`,
+          summary: `${withAutoCloseCheckLine(
+            `${reasonLine}Score ${r.score}/${r.total}. ${r.failureReason ? "Bot verification did not pass." : "Max attempts reached."}`,
+            autoClose
+          )}\n\n${riskMd}`,
         },
       });
       if (commentsEnabled) {
         await api.upsertPrComment(repo, pr, [
-          "## Clawptcha — challenge failed",
+          "## VOUCHA — challenge failed",
           "",
           r.failureReason
             ? `@${r.challenge.author_login} did not pass bot verification for this challenge.`
             : `@${r.challenge.author_login} did not pass the comprehension check after ${r.cfg.max_attempts} attempts.`,
           ...(r.failureReason ? ["", `Reason: ${r.failureReason}`] : []),
           "",
-          "Maintainers: please review this PR manually before merging.",
+          maintainerActionLine(autoClose),
           ...(detailedComments ? ["", riskMd] : []),
         ].join("\n"));
       }
@@ -144,8 +202,8 @@ export async function onChallengeResolved(
         status: "completed", conclusion: "neutral",
         details_url: url,
         output: {
-          title: "Clawptcha unavailable",
-          summary: "Quiz generation failed (LLM/service issue). Not blocking the merge — this is a Clawptcha-side problem, not a verdict on the PR.",
+          title: "VOUCHA unavailable",
+          summary: "Quiz generation failed (LLM/service issue). Not blocking the merge — this is a VOUCHA-side problem, not a verdict on the PR.",
         },
       });
       break;
@@ -179,6 +237,17 @@ export async function sweepStaleChallenges(
   await env.DB.prepare("DELETE FROM sessions WHERE created_at < ?")
     .bind(new Date(now.getTime() - 2 * 60 * 60_000).toISOString())
     .run();
+
+  // Prepared quizzes include correct answers but are not attempts. Keep them
+  // only long enough to bridge GitHub comment verification to the start click.
+  await env.DB.prepare(
+    `DELETE FROM prepared_quizzes
+     WHERE created_at < ?
+        OR challenge_id IN (
+          SELECT id FROM challenges
+          WHERE status IN ('passed','failed_assisted','failed_final','neutral','superseded')
+        )`
+  ).bind(new Date(now.getTime() - 24 * 60 * 60_000).toISOString()).run();
 
   // Neutralize dangling challenges: awaiting/ready with no quiz attempt after
   // 24h means the service failed mid-setup or the author never showed — mark
@@ -240,14 +309,19 @@ export async function sweepStaleChallenges(
         "SELECT score FROM quizzes WHERE challenge_id=? AND score IS NOT NULL ORDER BY attempt_number DESC LIMIT 1"
       ).bind(ch.id).first<{ score: number }>();
       const scoreLine = quiz ? ` Final score: ${quiz.score}/4.` : "";
+      const cfg = resolveConfig(ch.config_json);
+      const autoClose = await maybeAutoClosePr(api, ch, cfg, ch.status);
       await api.updateCheckRun(ch.repo_full_name, ch.check_run_id!, {
         status: "completed", conclusion,
         output: {
           title: conclusion === "success" ? "Passed"
             : ch.status === "failed_assisted" ? "Failed — challenge assistance detected"
             : conclusion === "failure" ? "Failed — attempts exhausted"
-            : "Clawptcha unavailable",
-          summary: `Reconciled by scheduled sweep: challenge resolved as '${ch.status}'.${scoreLine}`,
+            : "VOUCHA unavailable",
+          summary: withAutoCloseCheckLine(
+            `Reconciled by scheduled sweep: challenge resolved as '${ch.status}'.${scoreLine}`,
+            autoClose
+          ),
         },
       });
     } catch { /* try again next cron tick */ }

@@ -1,16 +1,16 @@
 ---
 title: Privacy and data
-description: What CLAWPTCHA stores, what it reads transiently, and what contributors accept before a challenge starts.
+description: What VOUCHA stores, what it reads transiently, and what contributors accept before a challenge starts.
 ---
 
-CLAWPTCHA is currently self-deployed. Operators control their own Cloudflare
+VOUCHA is currently self-deployed. Operators control their own Cloudflare
 storage, GitHub App credentials, model provider choices, and data retention.
 
 The product is designed to keep data custody narrow: enough public PR context
 to run the gate, plus the answers and summary signals a contributor accepts
 before beginning a challenge.
 
-The visible CLAWPTCHA result lives on the pull request in the same vein as CI
+The visible VOUCHA result lives on the pull request in the same vein as CI
 checks, branch-protection gates, review comments, and the contribution itself.
 Maintainers should treat it as public review evidence. Detailed answer
 selections and summary telemetry are retained for maintainer audit rather than
@@ -18,7 +18,7 @@ published as a separate public profile.
 
 ## What is stored
 
-CLAWPTCHA stores:
+VOUCHA stores:
 
 - GitHub installation and repository identifiers for installed repositories;
 - pull request number, head SHA, author login, challenge status, attempt state,
@@ -35,7 +35,7 @@ CLAWPTCHA stores:
 
 ## What is not stored
 
-CLAWPTCHA does not persist raw PR diffs, GitHub installation tokens, keystrokes,
+VOUCHA does not persist raw PR diffs, GitHub installation tokens, keystrokes,
 free-form answer text, browser recordings, or maintainer secrets.
 
 Raw diffs and GitHub API responses are read transiently to decide policy,
@@ -45,7 +45,7 @@ tokens are minted on demand and cached in memory only.
 ## Contributor acceptance
 
 Before a contributor starts a challenge, the start page requires a small
-acknowledgement. By accepting it, the contributor agrees that CLAWPTCHA may use
+acknowledgement. By accepting it, the contributor agrees that VOUCHA may use
 the repository and PR context to generate the quiz, post the outcome on the PR,
 and store their answer selections plus summary signals for the PR's
 maintainers.
@@ -60,6 +60,6 @@ Once a challenge reaches a terminal result, stored question text is purged while
 score, answer selections, challenge status, and summary telemetry remain as the
 audit trail.
 
-Scheduled sweeps remove expired sessions and old rate-limit rows. CLAWPTCHA
+Scheduled sweeps remove expired sessions and old rate-limit rows. VOUCHA
 should be treated as review evidence, not as a permanent source repository or
 analytics warehouse.

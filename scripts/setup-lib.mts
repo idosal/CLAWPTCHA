@@ -37,7 +37,7 @@ export function manifestFormHtml(manifest: object, state: string): string {
   const json = escapeAttr(JSON.stringify(manifest));
   return `<!doctype html>
 <html><body>
-  <p>Redirecting to GitHub to create the Clawptcha PR check app…</p>
+  <p>Redirecting to GitHub to create the VOUCHA PR check app…</p>
   <form id="f" action="https://github.com/settings/apps/new?state=${encodeURIComponent(state)}" method="post">
     <input type="hidden" name="manifest" value="${json}">
     <noscript><button type="submit">Continue to GitHub</button></noscript>
@@ -64,6 +64,29 @@ export function patchAppBaseUrl(jsonc: string, newUrl: string): { text: string; 
   return { text: jsonc.replace(re, `$1${newUrl}$3`), changed: true };
 }
 
+function escapeJsonStringValue(s: string): string {
+  return JSON.stringify(s).slice(1, -1);
+}
+
+export function patchTurnstileSiteKey(jsonc: string, siteKey: string): { text: string; changed: boolean } {
+  const existing = jsonc.match(/("TURNSTILE_SITE_KEY"\s*:\s*")([^"]*)(")/);
+  const escaped = escapeJsonStringValue(siteKey);
+  if (existing) {
+    if (existing[2] === siteKey) return { text: jsonc, changed: false };
+    return {
+      text: jsonc.replace(/("TURNSTILE_SITE_KEY"\s*:\s*")([^"]*)(")/, `$1${escaped}$3`),
+      changed: true,
+    };
+  }
+
+  const appBaseLine = /^(\s*"APP_BASE_URL"\s*:\s*"[^"]*",\s*)$/m;
+  if (!appBaseLine.test(jsonc)) throw new Error("APP_BASE_URL not found in wrangler.jsonc");
+  return {
+    text: jsonc.replace(appBaseLine, `$1\n    "TURNSTILE_SITE_KEY": "${escaped}",`),
+    changed: true,
+  };
+}
+
 // The GitHub manifest exchange returns a PKCS#1 key ("BEGIN RSA PRIVATE
 // KEY"); Web Crypto in the Worker only imports PKCS#8. Convert in-process —
 // this replaces the runbook's manual openssl step.
@@ -75,7 +98,6 @@ export interface SecretsInput {
   appId: number | string;
   privateKeyPkcs8: string;
   webhookSecret: string;
-  turnstileSiteKey: string;
   turnstileSecretKey: string;
   sessionSigningKey: string;
 }
@@ -85,7 +107,6 @@ export function buildSecretsJson(s: SecretsInput): Record<string, string> {
     GITHUB_APP_ID: String(s.appId),
     GITHUB_PRIVATE_KEY: s.privateKeyPkcs8,
     GITHUB_WEBHOOK_SECRET: s.webhookSecret,
-    TURNSTILE_SITE_KEY: s.turnstileSiteKey,
     TURNSTILE_SECRET_KEY: s.turnstileSecretKey,
     SESSION_SIGNING_KEY: s.sessionSigningKey,
   };

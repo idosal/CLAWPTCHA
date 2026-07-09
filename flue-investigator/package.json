@@ -1,5 +1,5 @@
 {
-  "name": "@clawptcha/flue-investigator",
+  "name": "@voucha/flue-investigator",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "flue build --target cloudflare && node scripts/patch-wrangler.mjs",
     "check": "tsc --noEmit",
-    "deploy": "npm run build && wrangler deploy --config dist/clawptcha_flue_investigator/wrangler.json",
+    "deploy": "npm run build && wrangler deploy --config dist/voucha_flue_investigator/wrangler.json",
     "dev": "flue dev --target cloudflare"
   },
   "dependencies": {

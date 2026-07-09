@@ -1,4 +1,4 @@
-import type { ClawptchaConfig } from "../config";
+import type { VouchaConfig } from "../config";
 
 export const ACCOUNTABILITY_ACKNOWLEDGEMENT_TEXT =
   "I understand, tested, and can support this change.";
@@ -15,7 +15,7 @@ const AI_DISCLOSURE_RE = /^\s*AI assistance:\s*(yes|no|n\/a|none)\s*$/im;
 
 export function evaluateAccountability(
   body: string | null,
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): AccountabilityResult {
   const text = body ?? "";
   const missing: string[] = [];
@@ -34,7 +34,7 @@ export function evaluateAccountability(
       "",
       ...missing.map((item) => `- ${item}`),
       "",
-      "Update the PR body, then push or reopen the PR to re-run CLAWPTCHA.",
+      "Update the PR body, then push or reopen the PR to re-run VOUCHA.",
     ].join("\n"),
   };
 }

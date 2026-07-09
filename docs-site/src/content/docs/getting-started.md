@@ -1,6 +1,6 @@
 ---
 title: Getting started
-description: A practical first rollout path for adding CLAWPTCHA to a repository.
+description: A practical first rollout path for adding VOUCHA to a repository.
 ---
 
 Start with a narrow policy, verify the check-run behavior on a few known PRs,
@@ -8,11 +8,11 @@ then tighten path-specific rules only where maintainers actually need them.
 
 ## 1. Self-deploy the service
 
-CLAWPTCHA is currently self-deployed. Run the Cloudflare Worker, D1 database,
+VOUCHA is currently self-deployed. Run the Cloudflare Worker, D1 database,
 GitHub App credentials, Turnstile keys, and model provider in your own account.
 The setup wizard deploys the Worker, creates the GitHub App through GitHub's
 manifest flow, writes Worker secrets, and leaves repository policy in
-`.github/clawptcha.yml`.
+`.github/voucha.yml`.
 
 ```bash
 npx wrangler login && npm run setup
@@ -24,9 +24,9 @@ for the first repository.
 
 ## 2. Add the first policy file
 
-Create `.github/clawptcha.yml` on the default branch or the branch you merge
-into. CLAWPTCHA reads policy from the PR's merge target, not from the PR branch.
-The full default policy template is `templates/clawptcha.yml`; this abbreviated
+Create `.github/voucha.yml` on the default branch or the branch you merge
+into. VOUCHA reads policy from the PR's merge target, not from the PR branch.
+The full default policy template is `templates/voucha.yml`; this abbreviated
 first policy keeps the same core behavior.
 
 ```yaml
@@ -54,7 +54,7 @@ and records the default form honeypot signal as review evidence.
 
 Also copy or adapt `templates/contributing-policy.md` into `CONTRIBUTING.md`
 and `templates/pull_request_template.md` into the repository PR template. It
-tells contributors the same policy CLAWPTCHA enforces: AI assistance in PR
+tells contributors the same policy VOUCHA enforces: AI assistance in PR
 authoring is allowed, but challenge answers must come from the author's own
 understanding. The submitter must understand, test, explain, and support the PR.
 
@@ -63,14 +63,14 @@ understanding. The submitter must understand, test, explain, and support the PR.
 Before tightening policy, open or replay a few predictable PRs:
 
 - a docs-only PR should get an exempt success check;
-- a first-time contributor PR should wait for `/clawptcha approve`;
+- a first-time contributor PR should wait for `/voucha approve`;
 - a normal challenged PR should produce a quiz link, pass, and then post a
   green attestation check;
 - a failed quiz should enter cooldown and then offer a fresh retry;
 - a new commit after a pass should keep the prior pass with the default
   `rechallenge.on_push: never`.
 
-If the check reports neutral, treat that as a CLAWPTCHA-side availability or
+If the check reports neutral, treat that as a VOUCHA-side availability or
 generation problem, not as a verdict on the PR.
 
 ## 4. Add repository-specific rules
@@ -96,7 +96,7 @@ same cost.
 ## 5. Introduce trusted context
 
 When maintainers already plan work in GitHub issues, add issue-backed triage.
-This lets CLAWPTCHA exempt PRs that link to trusted issues and semantically
+This lets VOUCHA exempt PRs that link to trusted issues and semantically
 match the requested outcome.
 
 ```yaml
@@ -109,4 +109,4 @@ exemptions:
 ```
 
 Prefer labels and assignments your maintainers already use. Avoid adding a
-CLAWPTCHA-only label ceremony unless the repository truly wants that workflow.
+VOUCHA-only label ceremony unless the repository truly wants that workflow.

@@ -7,10 +7,10 @@ import { defineConfig } from "vite";
 const brandAssets = [
   "apple-touch-icon.png",
   "apple-touch-icon-dark.png",
-  "clawptcha-logo-dark.svg",
-  "clawptcha-logo-imagegen-v5.png",
-  "clawptcha-logo.svg",
-  "clawptcha-social-card.png",
+  "voucha-logo-dark.svg",
+  "voucha-logo-imagegen-v5.png",
+  "voucha-logo.svg",
+  "voucha-social-card.png",
   "favicon-32x32.png",
   "favicon-dark-32x32.png",
   "favicon-dark.svg",
@@ -29,7 +29,7 @@ function copyBrandAssets() {
 export default defineConfig({
   plugins: [
     {
-      name: "clawptcha-brand-assets",
+      name: "voucha-brand-assets",
       configureServer: copyBrandAssets,
       closeBundle: copyBrandAssets,
     },

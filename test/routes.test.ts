@@ -32,25 +32,25 @@ describe("POST /webhook", () => {
 });
 
 describe("GET /", () => {
-  it("serves the public CLAWPTCHA website", async () => {
+  it("serves the public VOUCHA website", async () => {
     const ctx = createExecutionContext();
-    const res = await worker.fetch(new Request("https://clawptcha.example.com/"), testEnv, ctx);
+    const res = await worker.fetch(new Request("https://voucha.example.com/"), testEnv, ctx);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     const html = await res.text();
-    expect(html).toContain("CLAWPTCHA");
+    expect(html).toContain("VOUCHA");
     expect(html).toContain("Deploy to Cloudflare");
-    expect(html).toContain("Deploy from GitHub");
+    expect(html).toContain("Install on GitHub");
     expect(html).toContain("Privacy, permissions, configuration, and verification details live in the docs.");
-    expect(html).not.toContain("clawptcha.example.com");
+    expect(html).toContain('<link rel="canonical" href="https://voucha.example.com">');
   });
 });
 
 describe("GET /docs", () => {
   it("redirects the bare docs path to the Starlight root", async () => {
     const ctx = createExecutionContext();
-    const res = await worker.fetch(new Request("https://clawptcha.example.com/docs"), testEnv, ctx);
+    const res = await worker.fetch(new Request("https://voucha.example.com/docs"), testEnv, ctx);
 
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/docs/");
@@ -69,7 +69,7 @@ describe("GET /docs", () => {
       },
     } as unknown as Env;
     const ctx = createExecutionContext();
-    const res = await worker.fetch(new Request("https://clawptcha.example.com/docs/"), docsEnv, ctx);
+    const res = await worker.fetch(new Request("https://voucha.example.com/docs/"), docsEnv, ctx);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
@@ -92,10 +92,10 @@ describe("GET /challenge/:id", () => {
     const ctx = createExecutionContext();
     const res = await worker.fetch(new Request("https://x/challenge/ch1"), testEnv, ctx);
     expect(res.status).toBe(200);
-    expect(res.headers.get("set-cookie")).toContain("clawptcha_session");
+    expect(res.headers.get("set-cookie")).toContain("voucha_session");
     const html = await res.text();
     expect(html).toContain("Verify from the PR.");
-    expect(html).toContain("/clawptcha verify ");
+    expect(html).toContain("/voucha verify ");
     expect(html).toContain("https://github.com/o/r/pull/1#issuecomment-new");
     expect(html).toContain('id="openPrLink"');
     expect(html).toContain("Open PR");
@@ -136,13 +136,13 @@ describe("GET /challenge/:id", () => {
     const cookie = await signSessionCookie(testEnv.SESSION_SIGNING_KEY, "sessVerifyStatus");
 
     const before = await worker.fetch(new Request("https://x/challenge/chVerifyStatus/verify/status", {
-      headers: { cookie: `clawptcha_session=${cookie}` },
+      headers: { cookie: `voucha_session=${cookie}` },
     }), testEnv, createExecutionContext());
     expect(await before.json()).toEqual({ verified: false });
 
     await testEnv.DB.prepare("UPDATE sessions SET gh_login='alice', verify_code=NULL WHERE id='sessVerifyStatus'").run();
     const after = await worker.fetch(new Request("https://x/challenge/chVerifyStatus/verify/status", {
-      headers: { cookie: `clawptcha_session=${cookie}` },
+      headers: { cookie: `voucha_session=${cookie}` },
     }), testEnv, createExecutionContext());
     expect(await after.json()).toEqual({ verified: true });
   });
@@ -167,6 +167,32 @@ describe("GET /challenge/:id", () => {
     expect(html).toContain("Refresh challenge");
     expect(html).toContain('href="/challenge/chPassedActions"');
   });
+
+  it("does not render Cloudflare testing site keys on production challenge pages", async () => {
+    await testEnv.DB.prepare(
+      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
+        author_login, status, config_json) VALUES ('chProdTestKey', 1, 'o/r', 6, 's6', 'alice', 'ready', '{}')`
+    ).run();
+    await testEnv.DB.prepare(
+      "INSERT INTO sessions (id, challenge_id, gh_login) VALUES ('sessProdTestKey', 'chProdTestKey', 'alice')"
+    ).run();
+    const cookie = await signSessionCookie(testEnv.SESSION_SIGNING_KEY, "sessProdTestKey");
+    const prodEnv = {
+      ...testEnv,
+      APP_BASE_URL: "https://voucha.dev",
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+    } as unknown as Env;
+
+    const res = await worker.fetch(new Request("https://voucha.dev/challenge/chProdTestKey", {
+      headers: { cookie: `voucha_session=${cookie}` },
+    }), prodEnv, createExecutionContext());
+
+    expect(res.status).toBe(503);
+    const html = await res.text();
+    expect(html).toContain("Cloudflare testing site key");
+    expect(html).not.toContain("data-sitekey");
+    expect(html).not.toContain("1x00000000000000000000AA");
+  });
 });
 
 describe("POST /challenge/:id/start", () => {
@@ -184,7 +210,7 @@ describe("POST /challenge/:id/start", () => {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",
-        cookie: `clawptcha_session=${cookie}`,
+        cookie: `voucha_session=${cookie}`,
       },
       body: new URLSearchParams({ "cf-turnstile-response": "tok" }),
     }), testEnv, ctx);
@@ -254,7 +280,7 @@ describe("challengeDeps.generateQuiz fail-open seam", () => {
       }, DEFAULT_CONFIG);
 
       expect(result).toEqual({ ok: false, error: "agent could not inspect PR" });
-      expect(fetchCalls).toEqual(["https://clawptcha-flue-investigator/workflows/investigate-pr?wait=result"]);
+      expect(fetchCalls).toEqual(["https://voucha-flue-investigator/workflows/investigate-pr?wait=result"]);
       const row = await testEnv.DB.prepare(
         "SELECT source, status FROM pr_investigations WHERE repo_full_name='o/r' AND pr_number=9991 AND head_sha='flue-fail-sha'"
       ).first<{ source: string; status: string }>();

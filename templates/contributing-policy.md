@@ -15,5 +15,5 @@ Maintainers may close PRs that appear automated, unsupported, unrelated to an
 accepted issue, or difficult to review because the author cannot explain or
 iterate on the change.
 
-Some PRs may be asked to pass CLAWPTCHA before merge. Passing is a public
+Some PRs may be asked to pass VOUCHA before merge. Passing is a public
 attestation that you personally understand, tested, and can support the change.

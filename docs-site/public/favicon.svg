@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
-  <title id="title">CLAWPTCHA logo mark</title>
-  <desc id="desc">A block C made from challenge tiles with code-diff and pull-request symbols.</desc>
+  <title id="title">VOUCHA logo mark</title>
+  <desc id="desc">A block V made from challenge tiles with code-diff and pull-request symbols.</desc>
   <defs>
     <style>
-      .ink { fill: #101816; }
-      .brand { fill: #ff6f4d; }
-      .tile {
-        rx: 16;
+      .ink {
+        fill: #101816;
+        stroke: transparent;
+        stroke-width: 3;
+        vector-effect: non-scaling-stroke;
+      }
+      .brand {
+        fill: #ff6f4d;
         stroke: transparent;
         stroke-width: 3;
         vector-effect: non-scaling-stroke;
@@ -19,7 +23,7 @@
         stroke-linejoin: round;
       }
       .dot {
-        fill: #101816;
+        fill: #ff6f4d;
         stroke: #d8f35f;
         stroke-width: 5;
       }
@@ -31,21 +35,17 @@
       }
     </style>
   </defs>
-
   <g>
-    <rect class="tile ink" x="24" y="24" width="56" height="56" rx="16" />
-    <rect class="tile ink" x="92" y="24" width="56" height="56" rx="16" />
-    <rect class="tile ink" x="160" y="24" width="56" height="56" rx="16" />
-    <rect class="tile ink" x="24" y="92" width="56" height="56" rx="16" />
-    <rect class="tile brand" x="24" y="160" width="56" height="56" rx="16" />
-    <rect class="tile ink" x="92" y="160" width="56" height="56" rx="16" />
-    <rect class="tile ink" x="160" y="160" width="56" height="56" rx="16" />
-
-    <path class="symbol" d="M43 52h18" />
-    <path class="symbol" d="M188 43v18M179 52h18" />
-    <path class="symbol" d="M180 188h14m0 0 11-10m-11 10 11 10" />
-    <circle class="dot" cx="180" cy="188" r="4" />
-    <circle class="dot" cx="205" cy="178" r="4" />
-    <circle class="dot" cx="205" cy="198" r="4" />
+    <rect class="ink" x="26" y="24" width="54" height="54" rx="16" />
+    <rect class="ink" x="160" y="24" width="54" height="54" rx="16" />
+    <rect class="ink" x="54" y="94" width="54" height="54" rx="16" />
+    <rect class="ink" x="132" y="94" width="54" height="54" rx="16" />
+    <rect class="brand" x="93" y="164" width="54" height="54" rx="16" />
+    <path class="symbol" d="M45 51h16" />
+    <path class="symbol" d="M187 43v16M179 51h16" />
+    <path class="symbol" d="M112 191h16m0 0 10-9m-10 9 10 9" />
+    <circle class="dot" cx="112" cy="191" r="4" />
+    <circle class="dot" cx="138" cy="182" r="4" />
+    <circle class="dot" cx="138" cy="200" r="4" />
   </g>
 </svg>

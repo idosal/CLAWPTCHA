@@ -18,7 +18,7 @@ CREATE TABLE challenges (
   approved_by TEXT,
   attempts_used INTEGER NOT NULL DEFAULT 0,
   cooldown_until TEXT,
-  config_json TEXT NOT NULL,        -- resolved ClawptchaConfig snapshot
+  config_json TEXT NOT NULL,        -- resolved VouchaConfig snapshot
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (repo_full_name, pr_number, head_sha)
 );

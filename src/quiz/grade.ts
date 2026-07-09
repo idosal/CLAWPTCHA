@@ -1,5 +1,5 @@
 import type { Question } from "./schema";
-import type { ClawptchaConfig } from "../config";
+import type { VouchaConfig } from "../config";
 import type { ChallengeStatus } from "../types";
 
 // answers: selected option indices; null = question timed out unanswered.
@@ -36,7 +36,7 @@ export type AttemptGate =
 
 export function canStartAttempt(
   state: AttemptState,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   now: Date
 ): AttemptGate {
   if (state.status !== "ready") return { allowed: false, reason: "not_ready" };
@@ -49,7 +49,7 @@ export function canStartAttempt(
   return { allowed: true };
 }
 
-export function nextCooldown(cfg: ClawptchaConfig, now: Date): string {
+export function nextCooldown(cfg: VouchaConfig, now: Date): string {
   return new Date(now.getTime() + cfg.cooldown_minutes * 60_000).toISOString();
 }
 

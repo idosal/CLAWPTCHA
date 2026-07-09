@@ -91,6 +91,19 @@ describe("generateQuiz", () => {
     const r = await generateQuiz(provider, "diff", "title", "body", ["a.ts"], null, 2);
     expect(r.ok).toBe(true);
   });
+
+  it("trims extra model-generated questions to the configured count", async () => {
+    const { provider } = stubProvider([{ ok: true, text: goodQuizJson }]);
+    const r = await generateQuiz(provider, "diff", "title", "body", ["a.ts"], null, 1);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.quiz.questions).toHaveLength(1);
+  });
+
+  it("accepts a fenced JSON response", async () => {
+    const { provider } = stubProvider([{ ok: true, text: `\`\`\`json\n${goodQuizJson}\n\`\`\`` }]);
+    const r = await generateQuiz(provider, "diff", "title", "body", ["a.ts"], null);
+    expect(r.ok).toBe(true);
+  });
 });
 
 describe("buildGenerationPrompt", () => {
@@ -104,6 +117,11 @@ describe("buildGenerationPrompt", () => {
   it("includes the configured question count", () => {
     const p = buildGenerationPrompt("diff", "title", null, ["a.ts"], null, 6);
     expect(p).toContain("Question count: 6");
+  });
+
+  it("makes small question counts explicit", () => {
+    const p = buildGenerationPrompt("diff", "title", null, ["a.ts"], null, 1);
+    expect(p).toContain("Generate exactly 1 question.");
   });
 });
 

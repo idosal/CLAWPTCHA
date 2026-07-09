@@ -1,4 +1,4 @@
-import type { ClawptchaConfig } from "../config";
+import type { VouchaConfig } from "../config";
 import type { PrContext, PrFilePatch } from "../challenge";
 import type { Env } from "../types";
 import {
@@ -31,7 +31,7 @@ export function hasFlueInvestigator(env: FlueEnv): boolean {
 
 export function chooseInvestigatorSource(
   env: FlueEnv,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   ctx: PrContext
 ): InvestigatorSelectionResult {
   const mode = investigationMode(ctx, cfg);
@@ -47,7 +47,7 @@ export function chooseInvestigatorSource(
 }
 
 function boundWorkflowUrl(): string {
-  return "https://clawptcha-flue-investigator/workflows/investigate-pr?wait=result";
+  return "https://voucha-flue-investigator/workflows/investigate-pr?wait=result";
 }
 
 function timeoutMs(env: FlueEnv): number {
@@ -56,10 +56,10 @@ function timeoutMs(env: FlueEnv): number {
   return 120_000;
 }
 
-function safeDiffExcerpt(diff: string, cfg: ClawptchaConfig): string {
+function safeDiffExcerpt(diff: string, cfg: VouchaConfig): string {
   const maxChars = cfg.context.detail_tokens * 4;
   if (diff.length <= maxChars) return diff;
-  return `${diff.slice(0, maxChars)}\n[diff excerpt truncated by CLAWPTCHA]`;
+  return `${diff.slice(0, maxChars)}\n[diff excerpt truncated by VOUCHA]`;
 }
 
 function lowSignalPath(path: string): boolean {
@@ -68,7 +68,7 @@ function lowSignalPath(path: string): boolean {
     /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/.test(path);
 }
 
-function filePayload(files: PrFilePatch[] | undefined, cfg: ClawptchaConfig): PrFilePatch[] {
+function filePayload(files: PrFilePatch[] | undefined, cfg: VouchaConfig): PrFilePatch[] {
   const rankedPatchFiles = new Set(
     [...(files ?? [])]
       .filter((file) => file.patch)
@@ -100,7 +100,7 @@ function artifactCandidate(envelope: unknown): unknown {
     if (result !== null && typeof result === "object" && !Array.isArray(result)) {
       const resultRecord = result as Record<string, unknown>;
       if (resultRecord.ok === false && typeof resultRecord.error === "string") {
-        return { __clawptcha_error: resultRecord.error };
+        return { __voucha_error: resultRecord.error };
       }
       if ("artifact" in resultRecord) return resultRecord.artifact;
     }
@@ -120,7 +120,7 @@ async function responseText(res: Response): Promise<string> {
 export async function investigatePrWithFlue(
   env: FlueEnv,
   ctx: PrContext,
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): Promise<InvestigationResult> {
   if (!env.FLUE_INVESTIGATOR) return { ok: false, error: "Flue investigator service binding is not configured" };
   if (!ctx.repoFullName || !ctx.prNumber || !ctx.headSha) {
@@ -171,9 +171,9 @@ export async function investigatePrWithFlue(
       candidate !== null &&
       typeof candidate === "object" &&
       !Array.isArray(candidate) &&
-      typeof (candidate as Record<string, unknown>).__clawptcha_error === "string"
+      typeof (candidate as Record<string, unknown>).__voucha_error === "string"
     ) {
-      return { ok: false, error: String((candidate as Record<string, unknown>).__clawptcha_error) };
+      return { ok: false, error: String((candidate as Record<string, unknown>).__voucha_error) };
     }
     return validateInvestigationArtifact(candidate, mode);
   } catch (e) {

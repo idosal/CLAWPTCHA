@@ -1,13 +1,20 @@
 import type { Env, Challenge } from "./types";
-import { getChallenge, setChallengeStatus, randomToken } from "./store";
+import {
+  deletePreparedQuiz,
+  getChallenge,
+  getPreparedQuiz,
+  randomToken,
+  setChallengeStatus,
+  upsertPreparedQuiz,
+} from "./store";
 import {
   getCodeHoneypotSignals,
   getMultipleChoiceGate,
   hasHoneypotSignal,
   resolveConfig,
-  type ClawptchaConfig,
+  type VouchaConfig,
 } from "./config";
-import type { Quiz, Question } from "./quiz/schema";
+import { validateQuiz, type Quiz, type Question } from "./quiz/schema";
 import {
   canStartAttempt, scoreQuiz, nextCooldown, answerWithinTimeLimit, type Answer,
 } from "./quiz/grade";
@@ -45,13 +52,13 @@ export interface ResolvedChallenge {
   score?: number;
   total?: number;
   telemetry: Telemetry | null;
-  cfg: ClawptchaConfig;
+  cfg: VouchaConfig;
   failureReason?: string;
 }
 
 // All side-effectful collaborators are injected for testability.
 export interface ChallengeDeps {
-  generateQuiz(ctx: PrContext, cfg: ClawptchaConfig): Promise<GenerateResult>;
+  generateQuiz(ctx: PrContext, cfg: VouchaConfig): Promise<GenerateResult>;
   verifyTurnstile(token: string): Promise<boolean>;
   fetchPrContext(challenge: Challenge): Promise<PrContext>;
   onChallengeResolved(resolved: ResolvedChallenge): Promise<void>;
@@ -89,7 +96,7 @@ async function failChallengeForBotSignal(
   env: Env,
   deps: ChallengeDeps,
   challenge: Challenge,
-  cfg: ClawptchaConfig,
+  cfg: VouchaConfig,
   reason: string,
   now: Date
 ): Promise<StartResult> {
@@ -128,6 +135,49 @@ async function failChallengeForBotSignal(
   return { ok: false, error: "bot_detected", reason };
 }
 
+async function takePreparedQuiz(env: Env, challengeId: string, questionCount: number): Promise<Quiz | null> {
+  const prepared = await getPreparedQuiz(env.DB, challengeId);
+  if (!prepared) return null;
+  await deletePreparedQuiz(env.DB, challengeId);
+  try {
+    const parsed = validateQuiz(JSON.parse(prepared.questions_json), questionCount);
+    if (parsed.ok) return parsed.quiz;
+    console.error("prepared quiz validation failed", { challengeId, error: parsed.error });
+    return null;
+  } catch (err) {
+    console.error("prepared quiz JSON invalid", { challengeId, error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
+export async function prepareQuizForChallenge(
+  env: Env,
+  deps: ChallengeDeps,
+  challengeId: string
+): Promise<void> {
+  const challenge = await getChallenge(env.DB, challengeId);
+  if (!challenge) return;
+  const cfg = resolveConfig(challenge.config_json);
+  const gate = canStartAttempt(challenge, cfg, deps.now());
+  if (!gate.allowed) return;
+  if (await getPreparedQuiz(env.DB, challenge.id)) return;
+
+  const ctx = await deps.fetchPrContext(challenge);
+  const generated = await deps.generateQuiz(ctx, cfg);
+  if (!generated.ok) {
+    console.error("prepared quiz generation failed", {
+      challengeId: challenge.id,
+      repo: challenge.repo_full_name,
+      prNumber: challenge.pr_number,
+      headSha: challenge.head_sha,
+      error: generated.error,
+    });
+    return;
+  }
+
+  await upsertPreparedQuiz(env.DB, challenge.id, generated.quiz);
+}
+
 export async function startQuizAttempt(
   env: Env, deps: ChallengeDeps, challengeId: string, ghLogin: string, turnstileToken: string,
   honeypotTriggered = false
@@ -155,10 +205,29 @@ export async function startQuizAttempt(
     return failChallengeForBotSignal(env, deps, challenge, cfg, TURNSTILE_BOT_FAILURE_REASON, now);
   }
 
-  const ctx = await deps.fetchPrContext(challenge);
-  const codeHoneypot = evaluateCodeHoneypotSignals(ctx.diff, getCodeHoneypotSignals(cfg));
-  const generated = await deps.generateQuiz(ctx, cfg);
+  const codeHoneypotSignals = getCodeHoneypotSignals(cfg);
+  const preparedQuiz = await takePreparedQuiz(env, challenge.id, getMultipleChoiceGate(cfg).questions);
+  let codeHoneypot = { triggered: false };
+  let generated: GenerateResult;
+  if (preparedQuiz) {
+    if (codeHoneypotSignals.length > 0) {
+      const ctx = await deps.fetchPrContext(challenge);
+      codeHoneypot = evaluateCodeHoneypotSignals(ctx.diff, codeHoneypotSignals);
+    }
+    generated = { ok: true, quiz: preparedQuiz };
+  } else {
+    const ctx = await deps.fetchPrContext(challenge);
+    codeHoneypot = evaluateCodeHoneypotSignals(ctx.diff, codeHoneypotSignals);
+    generated = await deps.generateQuiz(ctx, cfg);
+  }
   if (!generated.ok) {
+    console.error("quiz generation failed", {
+      challengeId: challenge.id,
+      repo: challenge.repo_full_name,
+      prNumber: challenge.pr_number,
+      headSha: challenge.head_sha,
+      error: generated.error,
+    });
     // Never block merges on our own failure: neutralize.
     await setChallengeStatus(env.DB, challenge.id, "neutral");
     // Terminal state: drop any question content from earlier attempts.

@@ -148,17 +148,17 @@ button,input{font:inherit}
   color:#101816;
   font:400 1rem/1.55 var(--sans);
 }
-.claw-shell{
+.voucha-shell{
   min-height:100vh;
   overflow-x:hidden;
   background:#f3f7f5;
   color:#101816;
 }
-.claw-shell *{
+.voucha-shell *{
   min-width:0;
   max-width:100%;
 }
-.claw-top{
+.voucha-top{
   width:min(1120px,calc(100% - 40px));
   min-height:66px;
   display:flex;
@@ -168,7 +168,7 @@ button,input{font:inherit}
   margin:0 auto;
   border-bottom:2px solid #101816;
 }
-.claw-brand{
+.voucha-brand{
   display:inline-flex;
   align-items:center;
   gap:10px;
@@ -176,7 +176,7 @@ button,input{font:inherit}
   font-weight:850;
   text-decoration:none;
 }
-.claw-mark{
+.voucha-mark{
   width:34px;
   height:34px;
   display:grid;
@@ -188,7 +188,7 @@ button,input{font:inherit}
   color:#101816;
   font:900 .92rem/1 var(--mono);
 }
-.claw-links{
+.voucha-links{
   display:flex;
   align-items:center;
   gap:18px;
@@ -196,14 +196,14 @@ button,input{font:inherit}
   font-size:.94rem;
   font-weight:750;
 }
-.claw-links a{text-decoration:none}
-.claw-links a:not(.gh):hover{text-decoration:underline}
-.claw-links .gh{display:inline-flex;align-items:center;color:#101816}
-.claw-links .gh svg{width:22px;height:22px;display:block;fill:currentColor}
+.voucha-links a{text-decoration:none}
+.voucha-links a:not(.gh):hover{text-decoration:underline}
+.voucha-links .gh{display:inline-flex;align-items:center;color:#101816}
+.voucha-links .gh svg{width:22px;height:22px;display:block;fill:currentColor}
 @media (hover:hover) and (pointer:fine){
-  .claw-links .gh:hover{opacity:.65}
+  .voucha-links .gh:hover{opacity:.65}
 }
-.claw-hero{
+.voucha-hero{
   width:min(1120px,calc(100% - 40px));
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(340px,430px);
@@ -212,8 +212,8 @@ button,input{font:inherit}
   margin:0 auto;
   padding:44px 0 34px;
 }
-.claw-copy{min-width:0}
-.claw-kicker{
+.voucha-copy{min-width:0}
+.voucha-kicker{
   display:inline-flex;
   align-items:center;
   gap:10px;
@@ -221,14 +221,14 @@ button,input{font:inherit}
   color:#5e3c76;
   font:850 .94rem/1.25 var(--sans);
 }
-.claw-kicker::before{
+.voucha-kicker::before{
   content:"";
   width:10px;
   height:10px;
   border-radius:999px;
   background:#5e3c76;
 }
-.claw-copy h1{
+.voucha-copy h1{
   max-width:9ch;
   margin:0;
   color:#101816;
@@ -238,24 +238,24 @@ button,input{font:inherit}
   letter-spacing:0;
   text-wrap:balance;
 }
-.claw-lead{
+.voucha-lead{
   max-width:48ch;
   margin:18px 0 0;
   color:#2f403b;
   font-size:1.22rem;
   line-height:1.42;
 }
-.claw-lead b{
+.voucha-lead b{
   color:#101816;
   font-weight:850;
 }
-.claw-actions{
+.voucha-actions{
   display:flex;
   flex-wrap:wrap;
   gap:10px;
   margin-top:24px;
 }
-.claw-button{
+.voucha-button{
   min-height:44px;
   display:inline-flex;
   align-items:center;
@@ -269,17 +269,17 @@ button,input{font:inherit}
   text-decoration:none;
   box-shadow:3px 3px 0 #101816;
 }
-.claw-button.primary{
+.voucha-button.primary{
   background:#101816;
   color:#fffdfa;
   box-shadow:3px 3px 0 #d8f35f;
 }
 @media (hover:hover) and (pointer:fine){
-  .claw-button:hover{transform:translateY(-1px)}
+  .voucha-button:hover{transform:translateY(-1px)}
 }
-.claw-button:active{transform:translateY(1px); box-shadow:1px 1px 0 #101816}
-.claw-button.primary:active{box-shadow:1px 1px 0 #d8f35f}
-.claw-button:focus-visible,.claw-links a:focus-visible{
+.voucha-button:active{transform:translateY(1px); box-shadow:1px 1px 0 #101816}
+.voucha-button.primary:active{box-shadow:1px 1px 0 #d8f35f}
+.voucha-button:focus-visible,.voucha-links a:focus-visible{
   outline:3px solid #5e3c76;
   outline-offset:3px;
 }
@@ -417,7 +417,7 @@ button,input{font:inherit}
   font-size:.92rem;
   line-height:1.35;
 }
-.claw-section{
+.voucha-section{
   width:min(1120px,calc(100% - 40px));
   display:grid;
   grid-template-columns:minmax(0,.75fr) minmax(280px,.42fr);
@@ -427,7 +427,7 @@ button,input{font:inherit}
   padding:38px 0;
   border-top:2px solid #101816;
 }
-.claw-section h2{
+.voucha-section h2{
   max-width:16ch;
   margin:0;
   color:#101816;
@@ -437,7 +437,7 @@ button,input{font:inherit}
   letter-spacing:0;
   text-wrap:balance;
 }
-.claw-section p{
+.voucha-section p{
   max-width:62ch;
   margin:12px 0 0;
   color:#2f403b;
@@ -486,7 +486,7 @@ button,input{font:inherit}
   font-size:.92rem;
   line-height:1.35;
 }
-.claw-footer{
+.voucha-footer{
   width:min(1120px,calc(100% - 40px));
   display:flex;
   justify-content:space-between;
@@ -498,7 +498,7 @@ button,input{font:inherit}
   font-size:.94rem;
 }
 @media (max-width:860px){
-  .claw-hero,.claw-section{
+  .voucha-hero,.voucha-section{
     grid-template-columns:1fr;
   }
   .policy-strip{
@@ -513,45 +513,45 @@ button,input{font:inherit}
   }
 }
 @media (max-width:560px){
-  .claw-shell{padding-right:24px}
-  .claw-top,.claw-hero,.policy-strip,.claw-section,.claw-footer{
+  .voucha-shell{padding-right:24px}
+  .voucha-top,.voucha-hero,.policy-strip,.voucha-section,.voucha-footer{
     width:auto;
     max-width:none;
     margin-left:16px;
     margin-right:0;
   }
-  .claw-top{min-height:62px}
-  .claw-links{display:none}
-  .claw-hero{
+  .voucha-top{min-height:62px}
+  .voucha-links{display:none}
+  .voucha-hero{
     gap:28px;
     padding:30px 0 28px;
   }
-  .claw-copy h1{
+  .voucha-copy h1{
     width:100%;
     max-width:100%;
     font-size:3rem;
     overflow-wrap:anywhere;
   }
-  .claw-lead{
+  .voucha-lead{
     width:100%;
     max-width:100%;
     font-size:1rem;
     overflow-wrap:anywhere;
   }
-  .claw-kicker{
+  .voucha-kicker{
     gap:8px;
     font-size:.9rem;
   }
-  .claw-kicker::before{
+  .voucha-kicker::before{
     width:9px;
     height:9px;
   }
-  .claw-actions{
+  .voucha-actions{
     display:grid;
     width:320px;
     max-width:calc(100vw - 56px);
   }
-  .claw-button{
+  .voucha-button{
     width:100%;
     max-width:100%;
   }
@@ -578,7 +578,7 @@ button,input{font:inherit}
   .receipt-line span,
   .receipt-foot,
   .policy-chip span,
-  .claw-section p,
+  .voucha-section p,
   .install-ticket p{
     overflow-wrap:anywhere;
   }
@@ -592,16 +592,16 @@ button,input{font:inherit}
     padding:14px;
   }
   .policy-chip:first-child{border-top:0}
-  .claw-section{
+  .voucha-section{
     gap:18px;
     padding:30px 0;
   }
-  .claw-section h2{font-size:2rem}
+  .voucha-section h2{font-size:2rem}
   .install-ticket code{
     white-space:pre-wrap;
     overflow-wrap:anywhere;
   }
-  .claw-footer{flex-direction:column}
+  .voucha-footer{flex-direction:column}
 }
 .app{
   min-height:min(760px,calc(100vh - 48px));
@@ -1028,7 +1028,7 @@ h1{
   .btn-secondary:hover{border-color:var(--ink-faint); background:var(--panel-2)}
 }
 .btn:active,.btn-secondary:active{transform:translateY(1px)}
-.btn:disabled{
+.btn:disabled,.btn-secondary:disabled{
   cursor:not-allowed;
   opacity:.48;
   filter:saturate(.75);
@@ -1185,6 +1185,24 @@ h1{
   overflow-wrap:anywhere;
   word-break:break-word;
 }
+.command-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:4px;
+}
+.command-row code{
+  flex:1 1 auto;
+  min-width:0;
+  margin-top:0;
+}
+.command-copy-button{
+  flex:0 0 auto;
+  min-width:0;
+  min-height:34px;
+  padding:0 10px;
+  font-size:.84rem;
+}
 .consent-check:has(input:focus-visible){
   outline:3px solid var(--focus);
   outline-offset:3px;
@@ -1199,6 +1217,68 @@ h1{
   color:var(--warn);
   font-size:.92rem;
   font-weight:690;
+}
+.start-progress{
+  width:100%;
+  max-width:640px;
+  display:grid;
+  gap:12px;
+  padding:13px 14px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  background:var(--panel);
+  color:var(--ink-dim);
+}
+.start-progress[hidden]{display:none}
+.start-progress strong{
+  display:block;
+  color:var(--ink);
+  font-weight:760;
+}
+.start-progress p{
+  margin:0;
+  font-size:.92rem;
+  line-height:1.42;
+}
+.start-progress ol{
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.start-progress li{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  color:var(--ink-faint);
+  font-size:.9rem;
+}
+.start-progress li::before{
+  content:"";
+  width:10px;
+  height:10px;
+  flex:0 0 auto;
+  border:2px solid var(--line-strong);
+  border-radius:999px;
+  background:var(--canvas);
+}
+.start-progress li.active{
+  color:var(--ink);
+  font-weight:690;
+}
+.start-progress li.active::before{
+  border-color:var(--brand);
+  background:var(--brand);
+  box-shadow:0 0 0 4px color-mix(in oklch,var(--brand-soft) 85%,transparent);
+}
+.start-progress li.done{
+  color:var(--ink-dim);
+}
+.start-progress li.done::before{
+  border-color:var(--ok);
+  background:var(--ok);
 }
 .context-tabs{
   display:none;
@@ -1644,7 +1724,7 @@ body:not(.site-body) .start-actions{
   margin-top:22px;
 }
 body:not(.site-body) .verify-actions{
-  grid-template-columns:minmax(260px,360px) minmax(132px,150px) minmax(132px,150px);
+  grid-template-columns:minmax(150px,1.2fr) repeat(3,minmax(112px,.9fr));
   align-items:start;
 }
 body:not(.site-body) .verify-actions .btn,
@@ -1655,7 +1735,8 @@ body:not(.site-body) .verify-actions .btn-secondary{
 body:not(.site-body) .start-actions .form-error,
 body:not(.site-body) .start-actions .terms-stack,
 body:not(.site-body) .start-actions .command-card,
-body:not(.site-body) .start-actions .choice-status{
+body:not(.site-body) .start-actions .choice-status,
+body:not(.site-body) .start-actions .start-progress{
   grid-column:1 / -1;
 }
 body:not(.site-body) .terms-stack{
@@ -1689,9 +1770,25 @@ body:not(.site-body) .command-card code{
   font-size:.9rem;
   font-weight:600;
 }
+body:not(.site-body) .command-copy-button{
+  width:auto;
+  min-height:32px;
+  padding:0 10px;
+  font-size:.84rem;
+}
 body:not(.site-body) .data-line{
   max-width:64ch;
   color:var(--ink-dim);
+  font-size:.88rem;
+}
+body:not(.site-body) .start-progress{
+  max-width:640px;
+  padding:11px 12px;
+  border-radius:6px;
+  background:#f6f8fa;
+}
+body:not(.site-body) .start-progress p,
+body:not(.site-body) .start-progress li{
   font-size:.88rem;
 }
 body:not(.site-body) .data-line a,
@@ -3408,18 +3505,18 @@ body:not(.site-body) .state-card p{
   }
 }
 
-/* CLAWPTCHA public site: maintainer-native, but not a GitHub skin. */
-.claw-shell{
+/* VOUCHA public site: maintainer-native, but not a GitHub skin. */
+.voucha-shell{
   min-height:100vh;
   overflow-x:hidden;
   background:#f3f7f5;
   color:#101816;
 }
-.claw-shell *{
+.voucha-shell *{
   max-width:100%;
   min-width:0;
 }
-.claw-top{
+.voucha-top{
   width:min(1120px,calc(100% - 40px));
   min-height:66px;
   display:flex;
@@ -3429,7 +3526,7 @@ body:not(.site-body) .state-card p{
   margin:0 auto;
   border-bottom:2px solid #101816;
 }
-.claw-brand{
+.voucha-brand{
   display:inline-flex;
   align-items:center;
   gap:10px;
@@ -3437,7 +3534,7 @@ body:not(.site-body) .state-card p{
   font-weight:850;
   text-decoration:none;
 }
-.claw-mark{
+.voucha-mark{
   width:34px;
   height:34px;
   display:grid;
@@ -3449,7 +3546,7 @@ body:not(.site-body) .state-card p{
   color:#101816;
   font:900 .92rem/1 var(--mono);
 }
-.claw-links{
+.voucha-links{
   display:flex;
   align-items:center;
   gap:18px;
@@ -3457,14 +3554,14 @@ body:not(.site-body) .state-card p{
   font-size:.94rem;
   font-weight:750;
 }
-.claw-links a{text-decoration:none}
-.claw-links a:not(.gh):hover{text-decoration:underline}
-.claw-links .gh{display:inline-flex;align-items:center;color:#101816}
-.claw-links .gh svg{width:22px;height:22px;display:block;fill:currentColor}
+.voucha-links a{text-decoration:none}
+.voucha-links a:not(.gh):hover{text-decoration:underline}
+.voucha-links .gh{display:inline-flex;align-items:center;color:#101816}
+.voucha-links .gh svg{width:22px;height:22px;display:block;fill:currentColor}
 @media (hover:hover) and (pointer:fine){
-  .claw-links .gh:hover{opacity:.65}
+  .voucha-links .gh:hover{opacity:.65}
 }
-.claw-hero{
+.voucha-hero{
   width:min(1120px,calc(100% - 40px));
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(340px,430px);
@@ -3473,8 +3570,8 @@ body:not(.site-body) .state-card p{
   margin:0 auto;
   padding:44px 0 34px;
 }
-.claw-copy{min-width:0}
-.claw-kicker{
+.voucha-copy{min-width:0}
+.voucha-kicker{
   display:inline-flex;
   align-items:center;
   gap:10px;
@@ -3482,14 +3579,14 @@ body:not(.site-body) .state-card p{
   color:#5e3c76;
   font:850 .94rem/1.25 var(--sans);
 }
-.claw-kicker::before{
+.voucha-kicker::before{
   content:"";
   width:10px;
   height:10px;
   border-radius:999px;
   background:#5e3c76;
 }
-.claw-copy h1{
+.voucha-copy h1{
   max-width:9ch;
   margin:0;
   color:#101816;
@@ -3499,24 +3596,24 @@ body:not(.site-body) .state-card p{
   letter-spacing:0;
   text-wrap:balance;
 }
-.claw-lead{
+.voucha-lead{
   max-width:48ch;
   margin:18px 0 0;
   color:#2f403b;
   font-size:1.22rem;
   line-height:1.42;
 }
-.claw-lead b{
+.voucha-lead b{
   color:#101816;
   font-weight:850;
 }
-.claw-actions{
+.voucha-actions{
   display:flex;
   flex-wrap:wrap;
   gap:10px;
   margin-top:24px;
 }
-.claw-button{
+.voucha-button{
   min-height:44px;
   display:inline-flex;
   align-items:center;
@@ -3530,15 +3627,15 @@ body:not(.site-body) .state-card p{
   text-decoration:none;
   box-shadow:3px 3px 0 #101816;
 }
-.claw-button.primary{
+.voucha-button.primary{
   background:#101816;
   color:#fffdfa;
   box-shadow:3px 3px 0 #d8f35f;
 }
-.claw-button:hover{transform:translateY(-1px)}
-.claw-button:active{transform:translateY(1px); box-shadow:1px 1px 0 #101816}
-.claw-button.primary:active{box-shadow:1px 1px 0 #d8f35f}
-.claw-button:focus-visible,.claw-links a:focus-visible{
+.voucha-button:hover{transform:translateY(-1px)}
+.voucha-button:active{transform:translateY(1px); box-shadow:1px 1px 0 #101816}
+.voucha-button.primary:active{box-shadow:1px 1px 0 #d8f35f}
+.voucha-button:focus-visible,.voucha-links a:focus-visible{
   outline:3px solid #5e3c76;
   outline-offset:3px;
 }
@@ -3676,7 +3773,7 @@ body:not(.site-body) .state-card p{
   font-size:.92rem;
   line-height:1.35;
 }
-.claw-section{
+.voucha-section{
   width:min(1120px,calc(100% - 40px));
   display:grid;
   grid-template-columns:minmax(0,.75fr) minmax(280px,.42fr);
@@ -3686,7 +3783,7 @@ body:not(.site-body) .state-card p{
   padding:38px 0;
   border-top:2px solid #101816;
 }
-.claw-section h2{
+.voucha-section h2{
   max-width:16ch;
   margin:0;
   color:#101816;
@@ -3696,7 +3793,7 @@ body:not(.site-body) .state-card p{
   letter-spacing:0;
   text-wrap:balance;
 }
-.claw-section p{
+.voucha-section p{
   max-width:62ch;
   margin:12px 0 0;
   color:#2f403b;
@@ -3745,7 +3842,7 @@ body:not(.site-body) .state-card p{
   font-size:.92rem;
   line-height:1.35;
 }
-.claw-footer{
+.voucha-footer{
   width:min(1120px,calc(100% - 40px));
   display:flex;
   justify-content:space-between;
@@ -3757,7 +3854,7 @@ body:not(.site-body) .state-card p{
   font-size:.94rem;
 }
 @media (max-width:860px){
-  .claw-hero,.claw-section{
+  .voucha-hero,.voucha-section{
     grid-template-columns:1fr;
   }
   .policy-strip{
@@ -3772,51 +3869,51 @@ body:not(.site-body) .state-card p{
   }
 }
 @media (max-width:560px){
-  .claw-shell{
+  .voucha-shell{
     padding-right:24px;
   }
-  .claw-top,.claw-hero,.policy-strip,.claw-section,.claw-footer{
+  .voucha-top,.voucha-hero,.policy-strip,.voucha-section,.voucha-footer{
     width:auto!important;
     max-width:none!important;
     margin-left:16px;
     margin-right:0;
   }
-  .claw-top{
+  .voucha-top{
     min-height:62px;
   }
-  .claw-links{
+  .voucha-links{
     display:none;
   }
-  .claw-hero{
+  .voucha-hero{
     gap:28px;
     padding:30px 0 28px;
   }
-  .claw-copy h1{
+  .voucha-copy h1{
     width:100%;
     max-width:100%;
     font-size:3rem;
     overflow-wrap:anywhere;
   }
-  .claw-lead{
+  .voucha-lead{
     width:100%;
     max-width:100%;
     font-size:1rem;
     overflow-wrap:anywhere;
   }
-  .claw-kicker{
+  .voucha-kicker{
     gap:8px;
     font-size:.9rem;
   }
-  .claw-kicker::before{
+  .voucha-kicker::before{
     width:9px;
     height:9px;
   }
-  .claw-actions{
+  .voucha-actions{
     display:grid;
     width:320px!important;
     max-width:calc(100vw - 56px)!important;
   }
-  .claw-button{
+  .voucha-button{
     width:100%;
     max-width:100%;
   }
@@ -3845,7 +3942,7 @@ body:not(.site-body) .state-card p{
   .receipt-line span,
   .receipt-foot,
   .policy-chip span,
-  .claw-section p,
+  .voucha-section p,
   .install-ticket p{
     overflow-wrap:anywhere;
   }
@@ -3859,18 +3956,18 @@ body:not(.site-body) .state-card p{
     padding:14px;
   }
   .policy-chip:first-child{border-top:0}
-  .claw-section{
+  .voucha-section{
     gap:18px;
     padding:30px 0;
   }
-  .claw-section h2{
+  .voucha-section h2{
     font-size:2rem;
   }
   .install-ticket code{
     white-space:pre-wrap;
     overflow-wrap:anywhere;
   }
-  .claw-footer{
+  .voucha-footer{
     flex-direction:column;
   }
 }
@@ -4015,64 +4112,64 @@ body:not(.site-body) .state-card p{
 @media (prefers-color-scheme:dark){
   .site-body,
   .site-page,
-  .claw-shell{
+  .voucha-shell{
     background:#101612;
     color:#f1f7f3;
   }
-  .claw-top,
-  .claw-section,
-  .claw-footer{
+  .voucha-top,
+  .voucha-section,
+  .voucha-footer{
     border-color:#d8f35f;
   }
-  .claw-brand,
-  .claw-copy h1,
-  .claw-lead b,
+  .voucha-brand,
+  .voucha-copy h1,
+  .voucha-lead b,
   .policy-chip b,
-  .claw-section h2,
+  .voucha-section h2,
   .install-ticket h3,
   .install-mode b{
     color:#f7fff9;
   }
-  .claw-mark{
+  .voucha-mark{
     border-color:#f7fff9;
     background:#ff7a59;
     color:#101612;
     box-shadow:5px 5px 0 #d8f35f;
   }
-  .claw-links,
-  .claw-lead,
+  .voucha-links,
+  .voucha-lead,
   .policy-chip span,
-  .claw-section p,
+  .voucha-section p,
   .install-ticket p,
   .install-mode span,
-  .claw-footer{
+  .voucha-footer{
     color:#bfd0c6;
   }
-  .claw-kicker{
+  .voucha-kicker{
     color:#d8a7ff;
   }
-  .claw-kicker::before{
+  .voucha-kicker::before{
     background:#d8a7ff;
   }
-  .claw-button{
+  .voucha-button{
     border-color:#f7fff9;
     background:#19231f;
     color:#f7fff9;
     box-shadow:3px 3px 0 #ff7a59;
   }
-  .claw-button.primary{
+  .voucha-button.primary{
     background:#d8f35f;
     color:#101612;
     box-shadow:3px 3px 0 #ff7a59;
   }
-  .claw-button:active{
+  .voucha-button:active{
     box-shadow:1px 1px 0 #ff7a59;
   }
-  .claw-button.primary:active{
+  .voucha-button.primary:active{
     box-shadow:1px 1px 0 #ff7a59;
   }
-  .claw-button:focus-visible,
-  .claw-links a:focus-visible{
+  .voucha-button:focus-visible,
+  .voucha-links a:focus-visible{
     outline-color:#d8a7ff;
   }
   .policy-strip,
@@ -4160,11 +4257,11 @@ body:not(.site-body) .state-card p{
 }
 
 /* Public homepage craft pass: maintainer infrastructure with restrained brand cues. */
-.claw-hero{
+.voucha-hero{
   gap:clamp(36px,6vw,72px);
   padding:50px 0 30px;
 }
-.claw-lead{
+.voucha-lead{
   max-width:47ch;
   line-height:1.45;
 }
@@ -4269,7 +4366,7 @@ body:not(.site-body) .state-card p{
   background:#d8f35f;
   box-shadow:3px 0 0 #ff6f4d;
 }
-.claw-section{
+.voucha-section{
   grid-template-columns:minmax(0,.68fr) minmax(360px,.62fr);
   gap:clamp(32px,6vw,76px);
   padding:42px 0 36px;
@@ -4302,7 +4399,7 @@ body:not(.site-body) .state-card p{
 .install-mode span{
   max-width:44ch;
 }
-.install-mode .claw-button{
+.install-mode .voucha-button{
   width:fit-content;
   margin-top:4px;
 }
@@ -4322,11 +4419,11 @@ body:not(.site-body) .state-card p{
 .docs-section p{
   max-width:58ch;
 }
-.docs-section .claw-button{
+.docs-section .voucha-button{
   justify-self:end;
   white-space:nowrap;
 }
-.claw-footer code{
+.voucha-footer code{
   font-family:var(--mono);
 }
 @media (max-width:860px){
@@ -4348,7 +4445,7 @@ body:not(.site-body) .state-card p{
   .policy-chip:nth-child(3){
     border-left:0;
   }
-  .claw-section{
+  .voucha-section{
     grid-template-columns:1fr;
   }
   .docs-section{
@@ -4356,11 +4453,11 @@ body:not(.site-body) .state-card p{
   }
 }
 @media (max-width:560px){
-  .claw-hero{
+  .voucha-hero{
     gap:22px;
     padding-top:28px;
   }
-  .claw-actions,
+  .voucha-actions,
   .policy-receipt{
     width:100%!important;
     max-width:100%!important;
@@ -4384,79 +4481,79 @@ body:not(.site-body) .state-card p{
     top:12px;
     left:12px;
   }
-  .claw-section{
+  .voucha-section{
     gap:22px;
   }
   .docs-section{
     gap:18px;
     grid-template-columns:1fr;
   }
-  .docs-section .claw-button{
+  .docs-section .voucha-button{
     justify-self:stretch;
   }
   .install-ticket{
     box-shadow:none;
   }
-  .install-mode .claw-button{
+  .install-mode .voucha-button{
     width:100%;
   }
 }
 @media (prefers-color-scheme:dark){
   .site-body,
   .site-page,
-  .claw-shell{
+  .voucha-shell{
     background:#101613;
     color:#eef6f1;
   }
-  .claw-top,
-  .claw-section,
-  .claw-footer{
+  .voucha-top,
+  .voucha-section,
+  .voucha-footer{
     border-color:#2c3a33;
   }
-  .claw-brand,
-  .claw-copy h1,
-  .claw-lead b,
+  .voucha-brand,
+  .voucha-copy h1,
+  .voucha-lead b,
   .policy-chip b,
-  .claw-section h2,
+  .voucha-section h2,
   .install-ticket h3,
   .install-mode b{
     color:#f5fbf7;
   }
-  .claw-links,
-  .claw-lead,
+  .voucha-links,
+  .voucha-lead,
   .policy-chip span,
-  .claw-section p,
+  .voucha-section p,
   .install-ticket p,
   .install-mode span,
-  .claw-footer{
+  .voucha-footer{
     color:#b7c8be;
   }
-  .claw-kicker{
+  .voucha-kicker{
     color:#c6a4df;
   }
-  .claw-kicker::before{
+  .voucha-kicker::before{
     background:#c6a4df;
   }
-  .claw-mark{
+  .voucha-mark{
     border-color:#0b100e;
     background:#ff7a59;
     color:#0b100e;
     box-shadow:4px 4px 0 #d8f35f;
   }
-  .claw-button{
+  .voucha-button{
     border-color:#5c6a62;
     background:#17211d;
     color:#f5fbf7;
     box-shadow:none;
   }
-  .claw-button.primary{
+  .voucha-button.primary{
     border-color:#d8f35f;
     background:#d8f35f;
     color:#101613;
     box-shadow:0 0 0 2px #101613, 0 0 0 4px #45533f;
   }
-  .claw-button:active,
-  .claw-button.primary:active{
+  .voucha-button:active,
+  .voucha-button.primary:active{
     box-shadow:none;
   }
   .policy-strip,
@@ -4507,7 +4604,7 @@ body:not(.site-body) .state-card p{
   }
 }
 .brand-mark,
-.claw-mark{
+.voucha-mark{
   border:0;
   border-radius:0;
   background:transparent;
@@ -4520,19 +4617,19 @@ body:not(.site-body) .state-card p{
   width:34px;
   height:34px;
 }
-.claw-mark{
+.voucha-mark{
   width:34px;
   height:34px;
   display:block;
 }
 .brand-mark img,
-.claw-mark img{
+.voucha-mark img{
   width:100%;
   height:100%;
   display:block;
 }
 .brand-mark picture,
-.claw-mark picture{
+.voucha-mark picture{
   width:100%;
   height:100%;
   display:block;
@@ -4555,7 +4652,7 @@ interface LayoutOptions {
 }
 
 function brandLogo(): string {
-  return `<picture><source media="(prefers-color-scheme: dark)" srcset="/clawptcha-logo-dark.svg"><img src="/clawptcha-logo.svg" alt=""></picture>`;
+  return `<picture><source media="(prefers-color-scheme: dark)" srcset="/voucha-logo-dark.svg"><img src="/voucha-logo.svg" alt=""></picture>`;
 }
 
 function layout(
@@ -4571,7 +4668,7 @@ function layout(
   const social = options.social
     ? `<link rel="canonical" href="${esc(options.social.url)}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CLAWPTCHA">
+<meta property="og:site_name" content="VOUCHA">
 <meta property="og:title" content="${esc(options.social.title)}">
 <meta property="og:description" content="${esc(options.social.description)}">
 <meta property="og:url" content="${esc(options.social.url)}">
@@ -4597,14 +4694,14 @@ ${social}
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-dark-32x32.png" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon-dark.png" media="(prefers-color-scheme: dark)">
-<title>${esc(title)} — CLAWPTCHA</title>
+<title>${esc(title)} — VOUCHA</title>
 <style>${STYLE}</style></head>
 <body${bodyClass}><main class="${mainClass}">${body}</main></body></html>`;
 }
 
 function commandBar(tag: string, prRef?: string, timerHtml = ""): string {
   return `<header class="commandbar">
-  <div class="brand-lockup"><span class="mark brand-mark" aria-hidden="true">${brandLogo()}</span><span class="brand-name">CLAWPTCHA</span></div>
+  <div class="brand-lockup"><span class="mark brand-mark" aria-hidden="true">${brandLogo()}</span><span class="brand-name">VOUCHA</span></div>
   <div class="command-context">
     <span class="command-sep" aria-hidden="true"></span>
     <span class="command-title">${esc(tag)}</span>
@@ -4649,7 +4746,7 @@ function contextPanel(prRef: string, variant: "verify" | "start" | "question"): 
     <h3>No delegated access</h3>
     <ul class="plain-list">
       <li>GitHub verifies the comment author.</li>
-      <li>CLAWPTCHA never receives a user token.</li>
+      <li>VOUCHA never receives a user token.</li>
       <li>The app cannot comment, approve, or answer for you.</li>
     </ul>
   </section>`
@@ -4736,7 +4833,7 @@ export function verificationPage(
   verifyCode: string,
   prUrl: string
 ): string {
-  const command = `/clawptcha verify ${verifyCode}`;
+  const command = `/voucha verify ${verifyCode}`;
   const commandJson = JSON.stringify(command);
   const prUrlJson = JSON.stringify(prUrl);
   const statusUrlJson = JSON.stringify(`/challenge/${challengeId}/verify/status`);
@@ -4753,12 +4850,13 @@ export function verificationPage(
         <p class="lead">Post the one-time command as @${esc(authorLogin)}. GitHub verifies authorship; this tab continues when the PR comment arrives.</p>
         <div class="inline-note">
           <b>The app never acts for you</b>
-          <span>CLAWPTCHA reads the PR comment webhook. It never receives a GitHub user token and cannot comment, approve, or answer on your behalf.</span>
+          <span>VOUCHA reads the PR comment webhook. It never receives a GitHub user token and cannot comment, approve, or answer on your behalf.</span>
         </div>
         <form class="start-actions verify-actions" method="POST" action="/challenge/${esc(challengeId)}/verify">
-          <label class="command-card">
-            <span><strong>One-time PR comment</strong><small><code id="verifyCommand">${esc(command)}</code></small></span>
-          </label>
+          <div class="command-card">
+            <strong>One-time PR comment</strong>
+            <div class="command-row"><code id="verifyCommand">${esc(command)}</code><button class="btn-secondary command-copy-button" type="button" id="copyCommandButton" aria-label="Copy verification command">Copy</button></div>
+          </div>
           <button class="btn" type="button" id="copyOpenPr">Copy and open PR</button>
           <a class="btn-secondary" id="openPrLink" href="${esc(prUrl)}" target="_blank" rel="noopener noreferrer">Open PR</a>
           <button class="btn-secondary" type="submit">Check again</button>
@@ -4775,32 +4873,91 @@ export function verificationPage(
   var prUrl = ${prUrlJson};
   var statusUrl = ${statusUrlJson};
   var challengeUrl = ${challengeUrlJson};
-  var copyButton = document.getElementById("copyOpenPr");
+  var copyOpenButton = document.getElementById("copyOpenPr");
+  var copyOnlyButton = document.getElementById("copyCommandButton");
+  var openPrLink = document.getElementById("openPrLink");
   var command = document.getElementById("verifyCommand");
   var status = document.getElementById("verifyStatus");
   var pollTimer = null;
   function setStatus(text) {
     if (status) status.textContent = text;
   }
-  function copyCommand() {
-    if (navigator.clipboard && window.isSecureContext) {
-      return navigator.clipboard.writeText(commandText);
-    }
+  function copyWithTextarea() {
     var textarea = document.createElement("textarea");
     textarea.value = commandText;
     textarea.setAttribute("readonly", "");
     textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "0";
+    textarea.style.width = "1px";
+    textarea.style.height = "1px";
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
+    textarea.focus();
     textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
     try {
-      document.execCommand("copy");
-      return Promise.resolve();
+      return document.execCommand("copy");
     } catch (e) {
-      return Promise.reject(e);
+      return false;
     } finally {
       document.body.removeChild(textarea);
     }
+  }
+  function copyCommand() {
+    if (copyWithTextarea()) {
+      return Promise.resolve();
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(commandText);
+    }
+    return Promise.reject(new Error("Clipboard copy failed"));
+  }
+  function selectCommandText() {
+    if (!command || !window.getSelection || !document.createRange) return;
+    var range = document.createRange();
+    range.selectNodeContents(command);
+    var selection = window.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+  function restoreButton(button, label) {
+    window.setTimeout(function () {
+      button.disabled = false;
+      button.textContent = label;
+    }, 1800);
+  }
+  function openPr() {
+    var opened = window.open(prUrl, "_blank", "noopener,noreferrer");
+    if (!opened && openPrLink) {
+      openPrLink.click();
+    }
+    return Boolean(opened);
+  }
+  function handleCopy(button, options) {
+    if (!button) return;
+    var label = button.textContent || "";
+    button.disabled = true;
+    setStatus("Copying the command...");
+    copyCommand().then(function () {
+      button.textContent = options.open ? "Copied - opening PR" : "Copied";
+      if (options.open) {
+        var opened = openPr();
+        setStatus(opened
+          ? "Command copied. Paste it as a PR comment; this page will continue automatically."
+          : "Command copied. Use Open PR if the pull request did not open.");
+      } else {
+        setStatus("Command copied. Paste it as a PR comment on the PR.");
+      }
+      restoreButton(button, label);
+    }).catch(function () {
+      button.disabled = false;
+      button.textContent = label;
+      selectCommandText();
+      setStatus("Copy failed. The command text is selected; copy it manually, then use Open PR.");
+    });
+    poll();
   }
   function poll() {
     fetch(statusUrl, {
@@ -4826,60 +4983,58 @@ export function verificationPage(
     });
   }
   poll();
-  if (!copyButton || !command) return;
-  copyButton.addEventListener("click", function () {
-    var opened = window.open(prUrl, "_blank", "noopener,noreferrer");
-    copyCommand().then(function () {
-      copyButton.textContent = "Copied - PR opened";
-      setStatus(opened
-        ? "Paste the command as a PR comment. This page will continue automatically."
-        : "Command copied. Use Open PR if the pull request did not open.");
-    }).catch(function () {
-      setStatus("Copy failed. Select the command above, then use Open PR and paste it as a comment.");
+  if (!command) return;
+  if (copyOpenButton) {
+    copyOpenButton.addEventListener("click", function () {
+      handleCopy(copyOpenButton, { open: true });
     });
-    poll();
-  });
+  }
+  if (copyOnlyButton) {
+    copyOnlyButton.addEventListener("click", function () {
+      handleCopy(copyOnlyButton, { open: false });
+    });
+  }
 })();
 </script>`);
 }
 
-export function homePage(servedOrigin = "https://clawptcha.dev"): string {
-  const INSTALL_URL = "https://github.com/apps/clawptcha/installations/new";
+export function homePage(servedOrigin = "https://voucha.dev"): string {
+  const INSTALL_URL = "https://github.com/apps/voucha-app/installations/new";
   const origin = (() => {
     try {
       return new URL(servedOrigin).origin;
     } catch {
-      return "https://clawptcha.dev";
+      return "https://voucha.dev";
     }
   })();
   const socialDescription =
-    "CLAWPTCHA is free open-source GitHub PR governance for asking authors to prove they understand the change.";
+    "VOUCHA is free open-source GitHub PR governance for asking authors to prove they understand the change.";
   return layout("A policy layer for GitHub pull requests", `
-<div class="claw-shell">
-  <nav class="claw-top" aria-label="Primary">
-    <a class="claw-brand" href="/" aria-label="CLAWPTCHA home"><span class="claw-mark" aria-hidden="true">${brandLogo()}</span><span>CLAWPTCHA</span></a>
-    <div class="claw-links">
+<div class="voucha-shell">
+  <nav class="voucha-top" aria-label="Primary">
+    <a class="voucha-brand" href="/" aria-label="VOUCHA home"><span class="voucha-mark" aria-hidden="true">${brandLogo()}</span><span>VOUCHA</span></a>
+    <div class="voucha-links">
       <a href="#install">Install</a>
       <a href="/docs/">Docs</a>
-      <a class="gh" href="https://github.com/idosal/CLAWPTCHA" target="_blank" rel="noopener noreferrer" aria-label="CLAWPTCHA on GitHub" title="CLAWPTCHA on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+      <a class="gh" href="https://github.com/idosal/VOUCHA" target="_blank" rel="noopener noreferrer" aria-label="VOUCHA on GitHub" title="VOUCHA on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
     </div>
   </nav>
 
-  <section class="claw-hero" aria-labelledby="home-title">
-    <div class="claw-copy">
-      <p class="claw-kicker">A policy layer for GitHub pull requests.</p>
+  <section class="voucha-hero" aria-labelledby="home-title">
+    <div class="voucha-copy">
+      <p class="voucha-kicker">A policy layer for GitHub pull requests.</p>
       <h1 id="home-title">Say yes to <br>contributions.</h1>
-      <p class="claw-lead">You decide who's trusted and which changes need a closer look. CLAWPTCHA allows contributors to prove their understanding and intent.</p>
-      <div class="claw-actions">
-        <a class="claw-button primary" href="${INSTALL_URL}" target="_blank" rel="noopener noreferrer">Install the app</a>
-        <a class="claw-button" href="#install">Self-host it</a>
-        <a class="claw-button" href="/docs/">Docs</a>
+      <p class="voucha-lead">You decide who's trusted and which changes need a closer look. VOUCHA allows contributors to prove their understanding and intent in an interactive app.</p>
+      <div class="voucha-actions">
+        <a class="voucha-button primary" href="${INSTALL_URL}" target="_blank" rel="noopener noreferrer">Install the app</a>
+        <a class="voucha-button" href="#install">Self-host it</a>
+        <a class="voucha-button" href="/docs/">Docs</a>
       </div>
       <p class="proof-note">Open source and free.</p>
     </div>
 
     <aside class="policy-receipt" aria-label="GitHub Actions policy report example">
-      <div class="receipt-head"><span class="receipt-dot" aria-hidden="true">!</span><div><strong>CLAWPTCHA check</strong><span>pull_request #482</span></div></div>
+      <div class="receipt-head"><span class="receipt-dot" aria-hidden="true">!</span><div><strong>VOUCHA check</strong><span>pull_request #482</span></div></div>
       <h2 class="receipt-title">Challenge required</h2>
       <p class="receipt-subtitle">The author explains the change before review.</p>
       <div class="receipt-lines">
@@ -4891,29 +5046,29 @@ export function homePage(servedOrigin = "https://clawptcha.dev"): string {
     </aside>
   </section>
 
-  <section class="policy-strip" id="workflow" aria-label="CLAWPTCHA workflow">
-    <div class="policy-chip"><b>Screen the PR</b><span>trust, exemptions, sensitive paths, honeypots, quiet signals</span></div>
+  <section class="policy-strip" id="workflow" aria-label="VOUCHA workflow">
+    <div class="policy-chip"><b>Screen the PR</b><span>file-path level trust, exemptions, sensitive paths, honeypots, quiet signals</span></div>
     <div class="policy-chip"><b>Challenge the unknowns</b><span>short configurable tests scoped to the diff</span></div>
     <div class="policy-chip"><b>Review the record</b><span>a reasoned check and risk report for maintainers</span></div>
   </section>
 
-  <section class="claw-section" aria-labelledby="install-title">
+  <section class="voucha-section" aria-labelledby="install-title">
     <div>
       <h2 id="install-title">Install in a click, or run your own.</h2>
       <p>The hosted app is free and works on public repos: install it on GitHub and configure the policy for your repo. Teams that want more control or private repos can self-host the same setup.</p>
     </div>
-    <aside class="install-ticket" id="install" aria-label="Install CLAWPTCHA">
+    <aside class="install-ticket" id="install" aria-label="Install VOUCHA">
       <h3>Install path</h3>
       <div class="install-options">
         <div class="install-mode">
           <b>Install the hosted app</b>
           <span>Free, one-click, works on any public repo.</span>
-          <a class="claw-button primary" href="${INSTALL_URL}" target="_blank" rel="noopener noreferrer">Install on GitHub</a>
+          <a class="voucha-button primary" href="${INSTALL_URL}" target="_blank" rel="noopener noreferrer">Install on GitHub</a>
         </div>
         <div class="install-mode">
           <b>Self-host</b>
           <span>For private repos or full control: deploy the Worker to your own Cloudflare account and bring your own model. <code>npm run setup</code> wires the GitHub App, Turnstile, and secrets.</span>
-          <a class="claw-button" href="https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA" target="_blank" rel="noopener noreferrer">Deploy to Cloudflare</a>
+          <a class="voucha-button" href="https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/VOUCHA" target="_blank" rel="noopener noreferrer">Deploy to Cloudflare</a>
         </div>
       </div>
       <p class="install-note">Privacy, permissions, configuration, and verification details live in the docs.</p>
@@ -4922,13 +5077,13 @@ export function homePage(servedOrigin = "https://clawptcha.dev"): string {
 </div>`, {
     bodyClass: "site-body",
     mainClass: "site-page",
-    description: "CLAWPTCHA is free open-source GitHub PR governance that complements code review, CI, tests, and branch protection with comprehension checks and trust exemptions.",
+    description: "VOUCHA is free open-source GitHub PR governance that complements code review, CI, tests, and branch protection with comprehension checks and trust exemptions.",
     social: {
-      title: "CLAWPTCHA — A policy layer for GitHub pull requests",
+      title: "VOUCHA — A policy layer for GitHub pull requests",
       description: socialDescription,
       url: origin,
-      imageUrl: `${origin}/clawptcha-social-card.png`,
-      imageAlt: "Screenshot of the CLAWPTCHA landing page hero."
+      imageUrl: `${origin}/voucha-social-card.png`,
+      imageAlt: "Screenshot of the VOUCHA landing page hero."
     }
   });
 }
@@ -4959,6 +5114,14 @@ export function startPage(
           </div>
           <div class="turnstile-box" aria-label="Browser verification"><div class="cf-turnstile" data-sitekey="${esc(turnstileSiteKey)}"></div><span class="turnstile-fallback">Browser verification</span></div>
           <button class="btn" type="submit" id="startButton">Begin challenge</button>
+          <div class="start-progress" id="startProgress" role="status" aria-live="polite" hidden>
+            <div><strong id="startProgressTitle">Preparing the quiz</strong><p id="startProgressMessage">This can take a moment while VOUCHA reads the PR and asks the model for questions.</p></div>
+            <ol aria-label="Start progress">
+              <li data-start-step="browser" class="active">Checking browser session</li>
+              <li data-start-step="pr">Reading the pull request</li>
+              <li data-start-step="quiz">Generating PR-specific questions</li>
+            </ol>
+          </div>
         </form>
       </div>
     </section>
@@ -4970,10 +5133,39 @@ export function startPage(
 (function () {
   var form = document.getElementById("startForm");
   var button = document.getElementById("startButton");
+  var progress = document.getElementById("startProgress");
+  var title = document.getElementById("startProgressTitle");
+  var message = document.getElementById("startProgressMessage");
+  var steps = progress ? Array.prototype.slice.call(progress.querySelectorAll("[data-start-step]")) : [];
   if (!form || !button) return;
+  function markStep(name) {
+    steps.forEach(function (step) {
+      var current = step.getAttribute("data-start-step") === name;
+      step.classList.toggle("active", current);
+      if (current) return;
+      var order = ["browser", "pr", "quiz"];
+      step.classList.toggle("done", order.indexOf(step.getAttribute("data-start-step")) < order.indexOf(name));
+    });
+  }
+  function setProgress(nextTitle, nextMessage, step) {
+    if (title) title.textContent = nextTitle;
+    if (message) message.textContent = nextMessage;
+    markStep(step);
+  }
   form.addEventListener("submit", function () {
     button.disabled = true;
     button.textContent = "Starting challenge...";
+    if (progress) progress.hidden = false;
+    setProgress("Checking browser session", "Cloudflare is verifying this browser before the quiz starts.", "browser");
+    window.setTimeout(function () {
+      setProgress("Reading the pull request", "VOUCHA is fetching the PR title, changed files, and diff from GitHub.", "pr");
+    }, 1200);
+    window.setTimeout(function () {
+      setProgress("Generating the quiz", "The model is writing questions from this PR. First runs and larger diffs can take a little longer.", "quiz");
+    }, 3200);
+    window.setTimeout(function () {
+      setProgress("Still generating", "Keep this tab open. If generation fails, the check will go neutral so the PR is not blocked.", "quiz");
+    }, 10000);
   });
 })();
 </script>`);
@@ -5126,7 +5318,7 @@ export function resultPage(
         <p>${passed
           ? "The PR receives a record that you understand this change. Maintainers still see summary risk signals."
           : tone === "crit"
-            ? "The PR check stays failed. Maintainers should review the PR manually before merging."
+            ? "The PR check stays failed. Repository policy controls manual review or auto-close."
             : "Retry timing is controlled by repository policy. A retry receives a fresh quiz when available."}</p>
       </section>
       <div class="status-strip info">
@@ -5160,8 +5352,8 @@ export function errorPage(title: string, message: string, actions: PageAction[] 
         <span class="status-copy"><b>${esc(cleanTitle)}</b><span>Check the PR for the current gate state.</span></span>
       </div>
       <section class="state-card">
-        <h2>What CLAWPTCHA means</h2>
-        <p>CLAWPTCHA records PR comprehension. Bot verification failures are blocking; CLAWPTCHA-side service failures should not block a merge.</p>
+        <h2>What VOUCHA means</h2>
+        <p>VOUCHA records PR comprehension. Bot verification failures are blocking; VOUCHA-side service failures should not block a merge.</p>
       </section>
       <div class="status-strip info">
         <span class="status-dot">i</span>

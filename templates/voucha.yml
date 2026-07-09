@@ -1,5 +1,5 @@
-# CLAWPTCHA default repository policy.
-# Copy to .github/clawptcha.yml when you want explicit defaults in a repo.
+# VOUCHA default repository policy.
+# Copy to .github/voucha.yml when you want explicit defaults in a repo.
 #
 # Maintainer posture:
 # - AI-written code may be allowed by repo policy, but the challenge must be
@@ -18,7 +18,7 @@ gates:
 path_rules: []
 # Examples:
 # - Put auth, migrations, release, or core runtime paths under stricter gates.
-# - Use include_paths to run CLAWPTCHA only on maintained core directories.
+# - Use include_paths to run VOUCHA only on maintained core directories.
 exemptions: []
 # Examples:
 # - author_login for named trusted contributors.
@@ -81,3 +81,9 @@ max_context_tokens: null
 
 output:
   comments: normal
+  labels: true
+
+enforcement:
+  auto_close:
+    enabled: false
+    outcomes: [failed_assisted, failed_final]

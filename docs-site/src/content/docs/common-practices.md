@@ -3,7 +3,7 @@ title: Common practices
 description: Operational patterns for accountability, GitHub PR limits, trust tiers, honeypots, issue triage, path-specific gates, drafts, retries, and output volume.
 ---
 
-CLAWPTCHA works best as a maintainer-facing policy system. The strongest
+VOUCHA works best as a maintainer-facing policy system. The strongest
 rollouts are explicit about what is trusted, what is merely suspicious, and
 what should still go to human review.
 
@@ -17,7 +17,7 @@ author's own understanding. The submitter must understand, test, explain, and
 support the change.
 
 Use `templates/contributing-policy.md` as a starting point for `CONTRIBUTING.md`
-and `templates/pull_request_template.md` as a PR template. CLAWPTCHA should
+and `templates/pull_request_template.md` as a PR template. VOUCHA should
 reinforce that policy with an attestation challenge, not replace ordinary
 maintainer judgment.
 
@@ -36,7 +36,7 @@ That check is deliberately about responsibility, not authorship detection.
 
 For high-volume repositories, use GitHub's PR creation limits, trusted bypass
 lists, or temporary restrictions on who can open pull requests to reduce review
-load before a PR reaches CLAWPTCHA. CLAWPTCHA is best at proving understanding
+load before a PR reaches VOUCHA. VOUCHA is best at proving understanding
 and preserving review evidence for PRs that are already in the queue; GitHub
 should own raw volume throttling.
 
@@ -55,7 +55,7 @@ exemptions:
 ```
 
 Team checks require Members read permission on the GitHub App. Merged-PR counts
-use GitHub search. If either signal is unavailable, CLAWPTCHA falls back to the
+use GitHub search. If either signal is unavailable, VOUCHA falls back to the
 normal gate.
 
 ## Keep passive signals report-only
@@ -65,7 +65,7 @@ silently fail a PR. Form honeypots, code canaries, timings, and pointer
 summaries all have legitimate edge cases. Turnstile validation and browser
 automation flags are bot-verification gates and fail with an explicit reason.
 
-CLAWPTCHA currently forces `honeypot` and `code_honeypot` signals to
+VOUCHA currently forces `honeypot` and `code_honeypot` signals to
 `report_only: true`. A matched signal can appear in check-run summaries, risk
 reports, and flagged-pass labels, but it does not change the quiz score.
 
@@ -88,7 +88,7 @@ signals:
   - type: code_honeypot
     report_only: true
     patterns:
-      - "CLAWPTCHA_DO_NOT_ADD_THIS"
+      - "VOUCHA_DO_NOT_ADD_THIS"
     paths: ["src/**", "infra/**"]
 ```
 
@@ -126,7 +126,7 @@ rules before broad rules.
 ## Pick a draft strategy deliberately
 
 The default template uses `draft_prs: ignore`, so draft PRs produce no
-CLAWPTCHA check until they become ready for review. Use `draft_prs: neutral`
+VOUCHA check until they become ready for review. Use `draft_prs: neutral`
 when maintainers want visible check context without forcing unfinished work
 through a quiz. Use `draft_prs: challenge` only if the repository treats drafts
 as review-ready work.
@@ -156,7 +156,7 @@ Use `detailed` briefly when maintainers need risk detail in PR comments. Use
 `quiet` for high-volume repositories where check-run output is enough.
 
 Keep `output.labels: true` if maintainers triage from the PR list. When a quiz
-passes but multiple passive risk signals fire, CLAWPTCHA best-effort applies
+passes but multiple passive risk signals fire, VOUCHA best-effort applies
 `pr-comprehension:flagged` so the pass is visible without opening the check run.
 
 ## Treat large PRs as investigation problems

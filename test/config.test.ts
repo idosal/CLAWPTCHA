@@ -1,6 +1,6 @@
 // test/config.test.ts
 import { describe, it, expect } from "vitest";
-import defaultTemplateYaml from "../templates/clawptcha.yml?raw";
+import defaultTemplateYaml from "../templates/voucha.yml?raw";
 import {
   getAuthorAssociationExemptions,
   getGitHubTeamExemptions,
@@ -12,6 +12,7 @@ import {
   getRepositoryPermissionExemptions,
   hasHoneypotSignal,
   parseConfig,
+  shouldAutoClosePr,
   DEFAULT_CONFIG,
 } from "../src/config";
 
@@ -165,7 +166,7 @@ describe("parseConfig", () => {
       "signals:",
       "  - type: code_honeypot",
       "    report_only: false",
-      "    patterns: [CLAWPTCHA_DO_NOT_ADD_THIS, CLAWPTCHA_DO_NOT_ADD_THIS]",
+      "    patterns: [VOUCHA_DO_NOT_ADD_THIS, VOUCHA_DO_NOT_ADD_THIS]",
       "    paths: ['src/**', '*.md', 'src/**']",
       "",
     ].join("\n"));
@@ -173,7 +174,7 @@ describe("parseConfig", () => {
     expect(getCodeHoneypotSignals(cfg)).toEqual([{
       type: "code_honeypot",
       report_only: true,
-      patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"],
+      patterns: ["VOUCHA_DO_NOT_ADD_THIS"],
       paths: ["src/**", "*.md"],
     }]);
   });
@@ -237,6 +238,36 @@ describe("parseConfig", () => {
     expect(cfg.accountability).toEqual({
       require_pr_acknowledgement: true,
       require_ai_disclosure: true,
+    });
+  });
+
+  it("parses auto-close enforcement settings", () => {
+    const cfg = parseConfig([
+      "enforcement:",
+      "  auto_close:",
+      "    enabled: true",
+      "    outcomes: [failed_final, failed_final, nope]",
+      "",
+    ].join("\n"));
+
+    expect(cfg.enforcement).toEqual({
+      auto_close: {
+        enabled: true,
+        outcomes: ["failed_final"],
+      },
+    });
+    expect(shouldAutoClosePr(cfg, "failed_final")).toBe(true);
+    expect(shouldAutoClosePr(cfg, "failed_assisted")).toBe(false);
+    expect(shouldAutoClosePr(cfg, "failed_retry")).toBe(false);
+
+    const shorthand = parseConfig([
+      "enforcement:",
+      "  auto_close: true",
+      "",
+    ].join("\n"));
+    expect(shorthand.enforcement.auto_close).toEqual({
+      enabled: true,
+      outcomes: ["failed_assisted", "failed_final"],
     });
   });
 
@@ -361,6 +392,8 @@ describe("parseConfig", () => {
     a.context.ignore_paths.push("mutated/**");
     a.bot_policy.trusted_logins.push("bot");
     a.rechallenge.ignore_paths.push("mutated/**");
+    a.enforcement.auto_close.enabled = true;
+    a.enforcement.auto_close.outcomes.pop();
     a.accountability.require_ai_disclosure = true;
     a.trust.default_author_associations.push("CONTRIBUTOR");
     const codeSignal = a.signals.find((signal) => signal.type === "code_honeypot");
@@ -377,6 +410,12 @@ describe("parseConfig", () => {
     expect(b.context.ignore_paths).toEqual([]);
     expect(b.bot_policy.trusted_logins).toEqual([]);
     expect(b.rechallenge.ignore_paths).toEqual([]);
+    expect(b.enforcement).toEqual({
+      auto_close: {
+        enabled: false,
+        outcomes: ["failed_assisted", "failed_final"],
+      },
+    });
     expect(b.accountability).toEqual({
       require_pr_acknowledgement: false,
       require_ai_disclosure: false,

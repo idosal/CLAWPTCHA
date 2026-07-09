@@ -1,6 +1,6 @@
 # Security Policy
 
-CLAWPTCHA handles GitHub webhook payloads, GitHub App installation tokens,
+VOUCHA handles GitHub webhook payloads, GitHub App installation tokens,
 Cloudflare Worker secrets, generated quiz content, and contributor challenge
 records. Please report vulnerabilities privately before public disclosure.
 
@@ -8,7 +8,7 @@ records. Please report vulnerabilities privately before public disclosure.
 
 Open a private security advisory on GitHub:
 
-https://github.com/idosal/CLAWPTCHA/security/advisories/new
+https://github.com/idosal/VOUCHA/security/advisories/new
 
 If GitHub advisories are unavailable, contact the maintainer through the
 repository owner profile.

@@ -1,5 +1,5 @@
 {
-  "name": "clawptcha",
+  "name": "voucha",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-06", // bump alongside wrangler upgrades
   "compatibility_flags": ["nodejs_compat"],
@@ -10,7 +10,7 @@
     // database only exists after deploy; the brief unmigrated window on a
     // first deploy is cushioned by the app's fail-open behavior.
     // Tests auto-generate a temp config with a dummy id (see vitest.config.ts).
-    { "binding": "DB", "database_name": "clawptcha" }
+    { "binding": "DB", "database_name": "voucha" }
   ],
   "assets": {
     "binding": "ASSETS",
@@ -18,25 +18,36 @@
   },
   "ai": { "binding": "AI" },
   "triggers": { "crons": ["*/15 * * * *"] },
-  "routes": [
-    {
-      "pattern": "clawptcha.dev",
-      "custom_domain": true
-    }
-  ],
-  // Preferred for same-account Flue deployments after `npm run flue:deploy`:
+  "routes": ["voucha.dev/*"],
+  // Optional Flue binding. With the default repo config
+  // `context.investigator: auto`, normal PRs still use the main Worker; this is
+  // called only when a PR crosses the configured large-PR threshold.
   "services": [
-    { "binding": "FLUE_INVESTIGATOR", "service": "clawptcha-flue-investigator" }
+    { "binding": "FLUE_INVESTIGATOR", "service": "voucha-flue-investigator" }
   ],
   "vars": {
-    "APP_BASE_URL": "https://clawptcha.dev",
+    "APP_BASE_URL": "https://voucha.dev",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAADyNRVHGewtnAHY3",
     "LLM_PROVIDER": "workers-ai",
-    "LLM_MODEL": "@cf/moonshotai/kimi-k2.7-code"
-    // AI_GATEWAY_ID: set after creating an AI Gateway (spend caps + analytics)
+    "LLM_MODEL": "@cf/moonshotai/kimi-k2.7-code",
+    // Route Workers AI quiz generation through an AI Gateway so spend limits and
+    // analytics apply. "default" auto-creates the account's default gateway on
+    // first request (no manual setup, safe to deploy). The $50/month spend cap
+    // is configured ON the gateway (dashboard: AI > AI Gateway > default >
+    // Settings > Spend limits, or the gateway API), NOT here. Swap "default" for
+    // a dedicated gateway name to isolate voucha's spend — but create that
+    // gateway first, or inference degrades to a neutral check until it exists.
+    "AI_GATEWAY_ID": "default",
+    // Temporary access gate: comma/whitespace-separated `owner/repo` or bare
+    // `owner` entries. Empty/unset => act on every installed repo. Edit here and
+    // redeploy, or override in the Cloudflare dashboard (Workers > voucha >
+    // Settings > Variables) for a code-free change — note a later `npm run
+    // deploy` re-applies this value, so remove it here for pure dashboard control.
+    "REPO_ALLOWLIST": "idosal/voucha,idosal/voucha-owner-check-e2e"
   }
   // Secrets (set via `wrangler secret put`):
   //   GITHUB_APP_ID, GITHUB_PRIVATE_KEY (PKCS#8 PEM), GITHUB_WEBHOOK_SECRET,
-  //   TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY,
+  //   TURNSTILE_SECRET_KEY,
   //   SESSION_SIGNING_KEY (random 32+ bytes, hex)
   //   LLM_API_KEY — only for LLM_PROVIDER=anthropic|openai-compat
 }

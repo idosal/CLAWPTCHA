@@ -87,13 +87,13 @@ describe("GitHubApi", () => {
   it("returns null for a missing config file (404)", async () => {
     const f = mockFetch(404, { message: "Not Found" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    expect(await api.getFileContent("o/r", ".github/clawptcha.yml", "main")).toBeNull();
+    expect(await api.getFileContent("o/r", ".github/voucha.yml", "main")).toBeNull();
   });
 
   it("decodes base64 file content", async () => {
     const f = mockFetch(200, { content: btoa("pass_threshold: 4\n"), encoding: "base64" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    expect(await api.getFileContent("o/r", ".github/clawptcha.yml", "main")).toBe("pass_threshold: 4\n");
+    expect(await api.getFileContent("o/r", ".github/voucha.yml", "main")).toBe("pass_threshold: 4\n");
   });
 
   it("returns both legacy permission and GitHub role name for collaborators", async () => {
@@ -136,8 +136,8 @@ describe("GitHubApi", () => {
     expect(url.searchParams.get("per_page")).toBe("1");
   });
 
-  it("upserts the clawptcha PR comment (updates when marker found)", async () => {
-    const existing = [{ id: 9, body: "<!-- clawptcha --> old" }];
+  it("upserts the voucha PR comment (updates when marker found)", async () => {
+    const existing = [{ id: 9, body: "<!-- voucha --> old" }];
     const f = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (!init?.method || init.method === "GET") {
         return new Response(JSON.stringify(existing), { status: 200 });
@@ -149,7 +149,7 @@ describe("GitHubApi", () => {
     const patchCall = f.mock.calls.find(([, i]) => i?.method === "PATCH");
     expect(patchCall).toBeDefined();
     expect(String(patchCall![0])).toContain("/issues/comments/9");
-    expect(JSON.parse(String(patchCall![1]!.body)).body).toContain("<!-- clawptcha -->");
+    expect(JSON.parse(String(patchCall![1]!.body)).body).toContain("<!-- voucha -->");
   });
 
   it("adds labels to a PR via the issues labels endpoint", async () => {
@@ -160,6 +160,16 @@ describe("GitHubApi", () => {
     expect(String(url)).toBe("https://api.github.com/repos/o/r/issues/5/labels");
     expect(init!.method).toBe("POST");
     expect(JSON.parse(init!.body as string)).toEqual({ labels: ["pr-comprehension:flagged"] });
+  });
+
+  it("closes a pull request through the pulls endpoint", async () => {
+    const f = mockFetch(200, { number: 5, state: "closed" });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+    await api.closePullRequest("o/r", 5);
+    const [url, init] = f.mock.calls[0];
+    expect(String(url)).toBe("https://api.github.com/repos/o/r/pulls/5");
+    expect(init!.method).toBe("PATCH");
+    expect(JSON.parse(init!.body as string)).toEqual({ state: "closed" });
   });
 
   it("creates a missing label before it is used", async () => {
@@ -215,7 +225,7 @@ describe("GitHubApi", () => {
     await expect(api.getPrDiff("o/r", 7)).rejects.toThrow(/500/);
   });
 
-  it("creates the clawptcha PR comment when none exists (POST branch)", async () => {
+  it("creates the voucha PR comment when none exists (POST branch)", async () => {
     const f = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (!init?.method || init.method === "GET") {
         return new Response(JSON.stringify([{ id: 1, body: "unrelated comment" }]), { status: 200 });
@@ -227,7 +237,7 @@ describe("GitHubApi", () => {
     const postCall = f.mock.calls.find(([, i]) => i?.method === "POST");
     expect(postCall).toBeDefined();
     expect(String(postCall![0])).toContain("/issues/7/comments");
-    expect(JSON.parse(String(postCall![1]!.body)).body).toContain("<!-- clawptcha -->");
+    expect(JSON.parse(String(postCall![1]!.body)).body).toContain("<!-- voucha -->");
   });
 
   it("decodes UTF-8 config content correctly", async () => {
@@ -235,7 +245,7 @@ describe("GitHubApi", () => {
     const b64 = btoa(String.fromCharCode(...utf8));
     const f = mockFetch(200, { content: b64, encoding: "base64" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    const content = await api.getFileContent("o/r", ".github/clawptcha.yml", "main");
+    const content = await api.getFileContent("o/r", ".github/voucha.yml", "main");
     expect(content).toContain("café");
   });
 });

@@ -59,12 +59,42 @@ export function buildGenerationPrompt(
     "```",
     "",
     `Question count: ${questionCount}`,
+    countInstruction(questionCount),
     "Question types: consequence_mcq, blast_radius_multi, false_claim.",
     "Generate the quiz now.",
   ].join("\n");
 }
 
 export type GenerateResult = { ok: true; quiz: Quiz } | { ok: false; error: string };
+
+function parseProviderJson(text: string): unknown {
+  const trimmed = text.trim();
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
+  return JSON.parse(fenced ? fenced[1] : trimmed);
+}
+
+function normalizeGeneratedQuiz(raw: unknown, questionCount: number): unknown {
+  if (
+    raw !== null &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    Array.isArray((raw as { questions?: unknown }).questions) &&
+    (raw as { questions: unknown[] }).questions.length > questionCount
+  ) {
+    return {
+      ...raw,
+      questions: (raw as { questions: unknown[] }).questions.slice(0, questionCount),
+    };
+  }
+  return raw;
+}
+
+function countInstruction(questionCount: number): string {
+  if (questionCount < 3) {
+    return `Generate exactly ${questionCount} question${questionCount === 1 ? "" : "s"}. Do not include every question type; choose the strongest type for this PR.`;
+  }
+  return "Generate exactly the requested number of questions.";
+}
 
 async function generateQuizWithPrompt(
   provider: QuizProvider, prompt: string, questionCount: number, attempts = 2
@@ -79,8 +109,8 @@ async function generateQuizWithPrompt(
     });
     if (!result.ok) { lastError = result.error; continue; }
     let raw: unknown;
-    try { raw = JSON.parse(result.text); } catch { lastError = "invalid JSON"; continue; }
-    const validated = validateQuiz(raw, questionCount);
+    try { raw = parseProviderJson(result.text); } catch { lastError = "invalid JSON"; continue; }
+    const validated = validateQuiz(normalizeGeneratedQuiz(raw, questionCount), questionCount);
     if (validated.ok) return { ok: true, quiz: validated.quiz };
     lastError = validated.error;
   }
@@ -121,6 +151,7 @@ export function buildInvestigatedGenerationPrompt(
     "Use the investigation artifact as the source of truth. Ask about the PR's intent, behavior changes, affected surfaces, and risk/blast radius.",
     "Do not ask about exact file paths, symbols, line-level code behavior, or implementation trivia.",
     `Question count: ${questionCount}`,
+    countInstruction(questionCount),
     "Question types: consequence_mcq, blast_radius_multi, false_claim.",
     "Generate the quiz now.",
   ].join("\n");

@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import type { Env, Challenge } from "./types";
 import { verifyWebhookSignature } from "./github/webhook";
+import { isRepoAllowed } from "./github/allowlist";
 import { handlePullRequestEvent, handleIssueCommentEvent } from "./github/events";
 import { apiForInstallation, onChallengeResolved, sweepStaleChallenges } from "./resolve";
 import {
@@ -25,15 +26,17 @@ import {
   HONEYPOT_FIELD_NAME,
   type PageAction,
 } from "./ui/pages";
-import { startQuizAttempt, submitAnswer, type ChallengeDeps, type PrContext } from "./challenge";
+import { prepareQuizForChallenge, startQuizAttempt, submitAnswer, type ChallengeDeps, type PrContext } from "./challenge";
 import { generateQuiz, generateQuizFromInvestigation } from "./quiz/generate";
 import { redactForClient, type Quiz } from "./quiz/schema";
 import { QUESTION_TIME_LIMIT_MS } from "./quiz/grade";
-import { getMultipleChoiceGate, hasHoneypotSignal, resolveConfig, type ClawptchaConfig } from "./config";
+import { getMultipleChoiceGate, hasHoneypotSignal, resolveConfig, type VouchaConfig } from "./config";
 import { providerFromEnv, type QuizProvider } from "./quiz/providers";
 import { matchesGlob } from "./policy/exemptions";
+import { allowSessionCreation } from "./policy/ratelimit";
 import { sameGitHubLogin } from "./github/login";
 import { chooseInvestigatorSource, investigatePrWithFlue, type InvestigationSource } from "./flue/investigator";
+import { turnstileProductionConfigError } from "./turnstile";
 import {
   investigatePr,
   investigationMode,
@@ -71,7 +74,7 @@ app.onError((err, c) => {
 async function latestQuizResult(
   env: Env,
   challenge: Challenge,
-  cfg: ClawptchaConfig
+  cfg: VouchaConfig
 ): Promise<{ score: number; total: number; failureReason?: string } | null> {
   const row = await env.DB.prepare(
     `SELECT score, questions_json, answers_json, telemetry_json
@@ -127,9 +130,34 @@ function challengePageActions(challenge: Pick<Challenge, "id" | "repo_full_name"
   ];
 }
 
+function renderStartPage(
+  c: Context<{ Bindings: Env }>,
+  challenge: Challenge,
+  cfg: VouchaConfig,
+  startError = "",
+  status: 200 | 400 = 200
+): Response {
+  const turnstileError = turnstileProductionConfigError(
+    c.env.TURNSTILE_SITE_KEY,
+    c.req.url,
+    c.env.APP_BASE_URL
+  );
+  if (turnstileError) {
+    return c.html(errorPage(
+      "VOUCHA unavailable",
+      turnstileError,
+      challengePageActions(challenge)
+    ), 503);
+  }
+  return c.html(startPage(
+    `${challenge.repo_full_name}#${challenge.pr_number}`, c.env.TURNSTILE_SITE_KEY, challenge.id,
+    hasHoneypotSignal(cfg), startError
+  ), status);
+}
+
 function failedChallengeMessage(latest: { failureReason?: string } | null): string {
   if (latest?.failureReason) return `Bot verification failed: ${latest.failureReason}`;
-  return "No attempts remain. Maintainers should review this PR manually before merging.";
+  return "No attempts remain. The PR check is failed; repository policy controls whether maintainers review manually or VOUCHA closes the PR.";
 }
 
 function challengePathActions(path: string): PageAction[] {
@@ -158,9 +186,19 @@ app.post("/webhook", async (c) => {
           .bind(payload.installation.id, payload.installation.account.login).run();
         return;
       }
+      // Temporary access gate: skip work for repos outside the allowlist.
+      // The installation.created record above is left intact so the app can act
+      // immediately if the repo is later allowlisted.
+      const repoFullName = payload.repository?.full_name as string | undefined;
+      if (repoFullName && !isRepoAllowed(c.env.REPO_ALLOWLIST, repoFullName)) return;
+
       const api = await apiForInstallation(c.env, payload.installation.id);
       if (event === "pull_request") await handlePullRequestEvent(c.env, api, payload);
-      else if (event === "issue_comment") await handleIssueCommentEvent(c.env, api, payload);
+      else if (event === "issue_comment") {
+        await handleIssueCommentEvent(c.env, api, payload, {
+          prepareQuiz: (challenge) => prepareQuizForChallenge(c.env, challengeDeps(c.env), challenge.id),
+        });
+      }
     } catch (e) {
       console.error("webhook handling failed", event, e);
     }
@@ -199,7 +237,7 @@ function filterDiffByIgnoredPaths(diff: string, ignoredPaths: string[]): string 
   }).join("");
 }
 
-function filterContextForGeneration(ctx: PrContext, cfg: ClawptchaConfig): PrContext {
+function filterContextForGeneration(ctx: PrContext, cfg: VouchaConfig): PrContext {
   const ignoredPaths = cfg.context.ignore_paths;
   if (ignoredPaths.length === 0) return ctx;
   const filePatches = ctx.filePatches?.filter((file) => !pathIgnored(file.filename, ignoredPaths));
@@ -217,7 +255,7 @@ function filterContextForGeneration(ctx: PrContext, cfg: ClawptchaConfig): PrCon
 }
 
 async function currentSession(c: Context<{ Bindings: Env }>): Promise<ChallengeSession | null> {
-  const cookie = getCookie(c, "clawptcha_session");
+  const cookie = getCookie(c, "voucha_session");
   if (!cookie) return null;
   const sessionId = await verifySessionCookie(c.env.SESSION_SIGNING_KEY, cookie);
   if (!sessionId) return null;
@@ -239,7 +277,7 @@ async function createVerificationSession(
   const sessionId = randomToken();
   const verifyCode = newVerificationCode();
   await insertVerificationSession(c.env.DB, sessionId, challengeId, verifyCode);
-  setCookie(c, "clawptcha_session", await signSessionCookie(c.env.SESSION_SIGNING_KEY, sessionId), {
+  setCookie(c, "voucha_session", await signSessionCookie(c.env.SESSION_SIGNING_KEY, sessionId), {
     httpOnly: true, secure: true, sameSite: "Lax", path: "/", maxAge: 3600,
   });
   return {
@@ -264,7 +302,7 @@ async function ensureVerificationCode(
 export function challengeDeps(env: Env): ChallengeDeps {
   async function getOrCreateInvestigation(
     ctx: PrContext,
-    cfg: ClawptchaConfig,
+    cfg: VouchaConfig,
     provider: QuizProvider
   ): Promise<
     { ok: true; artifact: InvestigationArtifact; source: InvestigationSource; callsUsed: number }
@@ -409,12 +447,12 @@ app.get("/challenge/:id", async (c) => {
 
   if (challenge.status === "awaiting_approval") {
     return c.html(errorPage("Awaiting approval",
-      "A maintainer must approve this challenge first (`/clawptcha approve` on the PR).",
+      "A maintainer must approve this challenge first (`/voucha approve` on the PR).",
       challengePageActions(challenge)));
   }
   if (challenge.status === "neutral") {
-    return c.html(errorPage("Clawptcha unavailable",
-      "The challenge could not be completed because of a Clawptcha-side problem. The PR should not be blocked by this challenge.",
+    return c.html(errorPage("VOUCHA unavailable",
+      "The challenge could not be completed because of a VOUCHA-side problem. The PR should not be blocked by this challenge.",
       challengePageActions(challenge)));
   }
   if (challenge.status === "superseded") {
@@ -452,6 +490,15 @@ app.get("/challenge/:id", async (c) => {
 
   let session = await currentSession(c);
   if (!session || (!session.gh_login && session.challenge_id !== challenge.id)) {
+    // Cookie-less visits mint a session row. Behind Cloudflare (cf-connecting-ip
+    // present) cap this per IP so a public challenge URL can't be looped to grow
+    // the sessions table; local/dev requests (no header) are not throttled.
+    const clientIp = c.req.header("cf-connecting-ip");
+    if (clientIp && !(await allowSessionCreation(c.env.DB, clientIp, new Date()))) {
+      return c.html(errorPage("Too many requests",
+        "Too many challenge sessions from your network right now. Wait a minute, then refresh this link.",
+        challengePageActions(challenge)), 429);
+    }
     session = await createVerificationSession(c, challenge.id);
   }
   if (!session.gh_login) {
@@ -478,19 +525,16 @@ app.get("/challenge/:id", async (c) => {
       "This challenge is no longer active — a newer commit or outcome has replaced it. Check the PR for the current status.",
       challengePageActions(challenge)));
   }
-  return c.html(startPage(
-    `${challenge.repo_full_name}#${challenge.pr_number}`, c.env.TURNSTILE_SITE_KEY, challenge.id,
-    hasHoneypotSignal(cfg)
-  ));
+  return renderStartPage(c, challenge, cfg);
 });
 
 app.post("/challenge/:id/verify", async (c) => {
   const challenge = await getChallenge(c.env.DB, c.req.param("id"));
   if (!challenge) return c.html(errorPage("Not found", "This challenge link is invalid or expired."), 404);
-  const session = await currentSession(c);
-  if (!session || session.challenge_id !== challenge.id) {
-    await createVerificationSession(c, challenge.id);
-  }
+  // The "Check again" button lands here. Session creation happens only on
+  // GET /challenge/:id, which gates on challenge state and rate-limits per IP —
+  // so this just bounces back there instead of minting a session unconditionally
+  // for any challenge id.
   return c.redirect(`/challenge/${challenge.id}`);
 });
 
@@ -522,10 +566,7 @@ app.post("/challenge/:id/start", async (c) => {
         challengePageActions(challenge)), 409);
     }
     const cfg = resolveConfig(challenge.config_json);
-    return c.html(startPage(
-      `${challenge.repo_full_name}#${challenge.pr_number}`, c.env.TURNSTILE_SITE_KEY, challenge.id,
-      hasHoneypotSignal(cfg), "Accept the challenge terms to begin."
-    ), 400);
+    return renderStartPage(c, challenge, cfg, "Accept the challenge terms to begin.", 400);
   }
   const result = await startQuizAttempt(
     c.env, challengeDeps(c.env), c.req.param("id"),
@@ -537,9 +578,9 @@ app.post("/challenge/:id/start", async (c) => {
     const messages: Record<string, string> = {
       not_ready: "This challenge isn't ready (awaiting approval or already resolved).",
       cooldown: "Cooldown in effect — try again in a few minutes. You'll get a fresh quiz.",
-      attempts_exhausted: "No attempts remain. A maintainer has been asked to review manually.",
+      attempts_exhausted: "No attempts remain. The PR check is failed; repository policy controls manual review or auto-close.",
       rate_limited: "Rate limit reached. Try again later.",
-      generation_failed: "We couldn't generate the quiz. The check has been marked neutral — you're not blocked.",
+      generation_failed: "We couldn't generate the quiz from this PR right now. This is a VOUCHA-side generation problem, so the check has been marked neutral and you're not blocked.",
       not_author: "Only the PR author can take this challenge.",
       not_found: "Challenge not found.",
     };
@@ -549,7 +590,7 @@ app.post("/challenge/:id/start", async (c) => {
   // Store active quiz id on the session row to route question/answer requests.
   await c.env.DB.prepare("UPDATE sessions SET challenge_id=? WHERE id=?")
     .bind(c.req.param("id"), session.id).run();
-  setCookie(c, "clawptcha_quiz", result.quizId, {
+  setCookie(c, "voucha_quiz", result.quizId, {
     httpOnly: true, secure: true, sameSite: "Lax", path: "/", maxAge: 3600,
   });
   return c.redirect(`/challenge/${c.req.param("id")}/question`);
@@ -557,7 +598,7 @@ app.post("/challenge/:id/start", async (c) => {
 
 app.get("/challenge/:id/question", async (c) => {
   const session = await currentSession(c);
-  const quizId = getCookie(c, "clawptcha_quiz");
+  const quizId = getCookie(c, "voucha_quiz");
   if (!session?.gh_login || !quizId) return c.redirect(`/challenge/${c.req.param("id")}`);
   const quiz = await c.env.DB.prepare(
     `SELECT q.questions_json, q.current_question, q.finished_at, ch.author_login, ch.config_json
@@ -589,7 +630,7 @@ app.get("/challenge/:id/question", async (c) => {
 
 app.post("/challenge/:id/answer", async (c) => {
   const session = await currentSession(c);
-  const quizId = getCookie(c, "clawptcha_quiz");
+  const quizId = getCookie(c, "voucha_quiz");
   if (!session?.gh_login || !quizId) return c.redirect(`/challenge/${c.req.param("id")}`);
   // Same author binding as the question route: only the challenge author's
   // session may submit answers for this quiz.
@@ -623,7 +664,7 @@ app.post("/challenge/:id/answer", async (c) => {
     result.passed
       ? "The check is now green and an attestation was posted to the PR."
       : result.failureReason
-        ? `Bot verification failed: ${result.failureReason}`
+        ? `Bot verification failed: ${result.failureReason}. Repository policy controls manual review or auto-close.`
       : "Check the PR for retry availability (cooldown applies; retries get a fresh quiz).",
     challenge ? challengePageActions(challenge) : challengePathActions(c.req.path)
   ));
@@ -632,10 +673,10 @@ app.post("/challenge/:id/answer", async (c) => {
 app.get("/", (c) => c.html(homePage(new URL(c.req.url).origin)));
 app.get("/apple-touch-icon.png", staticAsset);
 app.get("/apple-touch-icon-dark.png", staticAsset);
-app.get("/clawptcha-logo-dark.svg", staticAsset);
-app.get("/clawptcha-logo-imagegen-v5.png", staticAsset);
-app.get("/clawptcha-logo.svg", staticAsset);
-app.get("/clawptcha-social-card.png", staticAsset);
+app.get("/voucha-logo-dark.svg", staticAsset);
+app.get("/voucha-logo-imagegen-v5.png", staticAsset);
+app.get("/voucha-logo.svg", staticAsset);
+app.get("/voucha-social-card.png", staticAsset);
 app.get("/favicon-32x32.png", staticAsset);
 app.get("/favicon-dark-32x32.png", staticAsset);
 app.get("/favicon-dark.svg", staticAsset);

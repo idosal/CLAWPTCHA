@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { env } from "cloudflare:test";
 import { signSessionCookie, verifySessionCookie } from "../src/ui/session";
 import {
-  startQuizAttempt, submitAnswer, type ChallengeDeps,
+  prepareQuizForChallenge, startQuizAttempt, submitAnswer, type ChallengeDeps,
 } from "../src/challenge";
-import { insertChallenge, randomToken, getChallenge } from "../src/store";
+import { getPreparedQuiz, insertChallenge, randomToken, getChallenge, upsertPreparedQuiz } from "../src/store";
 import { DEFAULT_CONFIG } from "../src/config";
 import type { Env } from "../src/types";
 
@@ -67,6 +67,44 @@ describe("startQuizAttempt", () => {
     const r = await startQuizAttempt(testEnv, d, id, "alice", "turnstile-token");
     expect(r.ok).toBe(true);
     expect(d.generateQuiz).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses a prepared quiz after Turnstile without generating during start", async () => {
+    const id = await makeChallenge();
+    await upsertPreparedQuiz(testEnv.DB, id, quiz);
+    const d = deps({
+      fetchPrContext: vi.fn(async () => {
+        throw new Error("should not fetch PR context when no code honeypot signal is configured");
+      }),
+      generateQuiz: vi.fn(async () => {
+        throw new Error("should not generate quiz during start");
+      }),
+    });
+
+    const r = await startQuizAttempt(testEnv, d, id, "alice", "turnstile-token");
+
+    expect(r.ok).toBe(true);
+    expect(d.fetchPrContext).not.toHaveBeenCalled();
+    expect(d.generateQuiz).not.toHaveBeenCalled();
+    expect(await getPreparedQuiz(testEnv.DB, id)).toBeNull();
+    const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id=?")
+      .bind(id).first<{ count: number }>();
+    expect(row?.count).toBe(1);
+  });
+
+  it("prepares a quiz without creating an attempt", async () => {
+    const id = await makeChallenge();
+    const d = deps();
+
+    await prepareQuizForChallenge(testEnv, d, id);
+
+    expect(d.fetchPrContext).toHaveBeenCalledTimes(1);
+    expect(d.generateQuiz).toHaveBeenCalledTimes(1);
+    const prepared = await getPreparedQuiz(testEnv.DB, id);
+    expect(JSON.parse(prepared!.questions_json).questions).toHaveLength(4);
+    const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id=?")
+      .bind(id).first<{ count: number }>();
+    expect(row?.count).toBe(0);
   });
 
   it("rejects a non-author even with a valid session", async () => {
@@ -133,7 +171,7 @@ describe("startQuizAttempt", () => {
       signals: [{
         type: "code_honeypot" as const,
         report_only: true,
-        patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"],
+        patterns: ["VOUCHA_DO_NOT_ADD_THIS"],
         paths: ["src/**"],
       }],
     });
@@ -142,7 +180,7 @@ describe("startQuizAttempt", () => {
         diff: [
           "diff --git a/src/app.ts b/src/app.ts",
           "+++ b/src/app.ts",
-          "+const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+          "+const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
         ].join("\n"),
         title: "t",
         body: null,
@@ -162,7 +200,7 @@ describe("startQuizAttempt", () => {
       signals: [{
         type: "code_honeypot" as const,
         report_only: true,
-        patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"],
+        patterns: ["VOUCHA_DO_NOT_ADD_THIS"],
         paths: ["src/**"],
       }],
     });
@@ -171,7 +209,7 @@ describe("startQuizAttempt", () => {
         diff: [
           "diff --git a/src/app.ts b/src/app.ts",
           "+++ b/src/app.ts",
-          "-const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+          "-const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
         ].join("\n"),
         title: "t",
         body: null,
@@ -302,7 +340,7 @@ describe("submitAnswer", () => {
       signals: [{
         type: "code_honeypot" as const,
         report_only: true,
-        patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"],
+        patterns: ["VOUCHA_DO_NOT_ADD_THIS"],
         paths: ["src/**"],
       }],
     });
@@ -311,7 +349,7 @@ describe("submitAnswer", () => {
         diff: [
           "diff --git a/src/app.ts b/src/app.ts",
           "+++ b/src/app.ts",
-          "+const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+          "+const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
         ].join("\n"),
         title: "t",
         body: null,

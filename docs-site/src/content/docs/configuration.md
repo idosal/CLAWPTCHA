@@ -1,16 +1,16 @@
 ---
 title: Configuration
-description: The current CLAWPTCHA policy surface for accountability, gates, exemptions, passive signals, path rules, investigation, retries, and output.
+description: The current VOUCHA policy surface for accountability, gates, exemptions, passive signals, path rules, investigation, retries, and output.
 ---
 
-Store repository policy in `.github/clawptcha.yml` on the default branch or
-merge target branch. CLAWPTCHA reads that merge-target file for every PR, so a
+Store repository policy in `.github/voucha.yml` on the default branch or
+merge target branch. VOUCHA reads that merge-target file for every PR, so a
 PR cannot weaken its own gate by editing config in the feature branch.
 
 All fields are optional. Invalid fields fall back to their defaults rather than
 breaking the whole policy file.
 
-Copy `templates/clawptcha.yml` when a repository wants the built-in defaults
+Copy `templates/voucha.yml` when a repository wants the built-in defaults
 committed explicitly. The default template uses `draft_prs: ignore`, so draft
 PRs stay quiet until they are marked ready for review. Copy
 `templates/contributing-policy.md` when the repository also wants maintainer
@@ -60,7 +60,7 @@ signals:
     report_only: true
   - type: code_honeypot
     report_only: true
-    patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"]
+    patterns: ["VOUCHA_DO_NOT_ADD_THIS"]
     paths: ["src/**", "infra/**"]
 
 require_approval: first_time
@@ -104,6 +104,11 @@ max_context_tokens: null
 output:
   comments: normal
   labels: true
+
+enforcement:
+  auto_close:
+    enabled: false
+    outcomes: [failed_assisted, failed_final]
 ```
 
 ## Capability map
@@ -117,6 +122,7 @@ output:
 | Passive evidence | `signals`, `output.labels` | Honeypot fields, code canaries, and flagged-pass labels. |
 | Investigation | `context`, `max_context_tokens` | How PR evidence is condensed before quiz generation. |
 | Reporting | `output.comments`, `output.labels` | PR comment volume and best-effort labels. |
+| Enforcement | `enforcement.auto_close` | Optional PR auto-close behavior after terminal hard failures. |
 
 ## Gates
 
@@ -138,7 +144,7 @@ configs should use `gates[0].pass_threshold`.
 ## Scope and path rules
 
 `skip_paths` exempts a PR only when every changed file matches. `include_paths`
-turns CLAWPTCHA into opt-in scope: when non-empty, a PR is exempt unless at
+turns VOUCHA into opt-in scope: when non-empty, a PR is exempt unless at
 least one changed file matches.
 
 ```yaml
@@ -170,7 +176,7 @@ The glob implementation is intentionally small: `**` matches path segments and
 
 `require_approval` accepts `first_time`, `always`, or `never`.
 
-- `first_time`: first-time or unknown GitHub authors need `/clawptcha approve`.
+- `first_time`: first-time or unknown GitHub authors need `/voucha approve`.
 - `always`: every challenged PR needs maintainer approval.
 - `never`: the challenge is served as soon as it is ready.
 
@@ -178,7 +184,7 @@ The glob implementation is intentionally small: `**` matches path segments and
 
 - `challenge`: drafts follow normal policy.
 - `neutral`: drafts get a visible neutral check and no challenge.
-- `ignore`: drafts produce no CLAWPTCHA check. This is the default.
+- `ignore`: drafts produce no VOUCHA check. This is the default.
 
 `max_attempts` accepts 1 through 10. `cooldown_minutes` accepts 0 or greater.
 A failed non-final attempt waits for cooldown and then receives a fresh quiz.
@@ -213,7 +219,7 @@ trust:
 reuses GitHub's collaborator permission API, matching both `role_name` values
 such as `maintain`, `admin`, and custom repository roles, and legacy
 `permission` values such as `write` or `read`. If GitHub cannot resolve access,
-CLAWPTCHA falls back to the gate.
+VOUCHA falls back to the gate.
 
 `github_team` trusts active members of named GitHub teams. Bare team slugs use
 the repository owner; `org/team-slug` can point at a specific organization.
@@ -255,7 +261,7 @@ should prefer `exemptions: [{ type: author_login, ... }]`.
 ## Accountability preflight
 
 `accountability` can require the PR body to include explicit responsibility
-fields before CLAWPTCHA creates a quiz.
+fields before VOUCHA creates a quiz.
 
 ```yaml
 accountability:
@@ -290,7 +296,7 @@ exemptions:
     trusted_labels: [accepted]
 ```
 
-CLAWPTCHA discovers normal closing references such as `Fixes #123`, `Closes
+VOUCHA discovers normal closing references such as `Fixes #123`, `Closes
 owner/repo#123`, and GitHub issue URLs. With the defaults, the issue must be in
 the same repository and must have a trusted signal: maintainer or collaborator
 author, trusted assignee, or configured trusted label.
@@ -317,7 +323,7 @@ signals are forced report-only even if the config says otherwise.
 signals:
   - type: code_honeypot
     report_only: true
-    patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"]
+    patterns: ["VOUCHA_DO_NOT_ADD_THIS"]
     paths: ["src/**", "infra/**"]
 ```
 
@@ -352,9 +358,31 @@ output:
 best-effort `pr-comprehension:flagged` label when a passed quiz has multiple passive
 risk signals.
 
+`enforcement.auto_close` is off by default. When enabled, VOUCHA closes the PR
+after configured terminal hard-failure outcomes; it never closes retryable
+failures, neutral service failures, drafts, or superseded challenges.
+
+```yaml
+enforcement:
+  auto_close: true
+```
+
+The shorthand above closes PRs for both supported auto-close outcomes:
+`failed_assisted` and `failed_final`. Use the object form to narrow it:
+
+```yaml
+enforcement:
+  auto_close:
+    enabled: true
+    outcomes: [failed_final]
+```
+
+Auto-close is best-effort. If GitHub rejects the close request, the VOUCHA check
+still stays failed and the PR comment asks maintainers to review manually.
+
 ## Context and investigation
 
-`context.strategy: adaptive` is the normal mode. CLAWPTCHA first builds an
+`context.strategy: adaptive` is the normal mode. VOUCHA first builds an
 investigation artifact from PR metadata, file map, and selected patch evidence,
 then generates the quiz from that artifact.
 
@@ -406,3 +434,4 @@ older truncation path.
 | `include_paths` | `[]` |
 | `context` | adaptive Worker/Flue auto selection with 8000 map tokens, 24000 detail tokens, 12 files, and large PR threshold of 100 files or 5000 changed lines |
 | `output` | `{ comments: "normal", labels: true }` |
+| `enforcement` | `{ auto_close: { enabled: false, outcomes: ["failed_assisted", "failed_final"] } }` |

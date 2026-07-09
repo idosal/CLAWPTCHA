@@ -13,7 +13,7 @@
 AI assistance: yes/no/n/a
 
 <!--
-CLAWPTCHA can require the Accountability fields above when the repository uses:
+VOUCHA can require the Accountability fields above when the repository uses:
 
 accountability:
   require_pr_acknowledgement: true

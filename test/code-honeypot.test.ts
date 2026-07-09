@@ -5,7 +5,7 @@ import type { CodeHoneypotSignal } from "../src/config";
 const signal: CodeHoneypotSignal = {
   type: "code_honeypot",
   report_only: true,
-  patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"],
+  patterns: ["VOUCHA_DO_NOT_ADD_THIS"],
   paths: ["src/**"],
 };
 
@@ -14,7 +14,7 @@ describe("evaluateCodeHoneypotSignals", () => {
     const result = evaluateCodeHoneypotSignals([
       "diff --git a/src/app.ts b/src/app.ts",
       "+++ b/src/app.ts",
-      "+const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+      "+const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
       "",
     ].join("\n"), [signal]);
 
@@ -28,8 +28,8 @@ describe("evaluateCodeHoneypotSignals", () => {
     const result = evaluateCodeHoneypotSignals([
       "diff --git a/src/app.ts b/src/app.ts",
       "+++ b/src/app.ts",
-      " const old = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
-      "-const removed = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+      " const old = 'VOUCHA_DO_NOT_ADD_THIS';",
+      "-const removed = 'VOUCHA_DO_NOT_ADD_THIS';",
       "",
     ].join("\n"), [signal]);
 
@@ -40,7 +40,7 @@ describe("evaluateCodeHoneypotSignals", () => {
     const result = evaluateCodeHoneypotSignals([
       "diff --git a/docs/notes.md b/docs/notes.md",
       "+++ b/docs/notes.md",
-      "+CLAWPTCHA_DO_NOT_ADD_THIS",
+      "+VOUCHA_DO_NOT_ADD_THIS",
       "",
     ].join("\n"), [signal]);
 
@@ -51,7 +51,7 @@ describe("evaluateCodeHoneypotSignals", () => {
     const result = evaluateCodeHoneypotSignals([
       "diff --git a/src/generated prompt.ts b/src/generated prompt.ts",
       "+++ b/src/generated prompt.ts",
-      "+const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+      "+const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
       "",
     ].join("\n"), [signal]);
 
@@ -65,7 +65,7 @@ describe("evaluateCodeHoneypotSignals", () => {
     const result = evaluateCodeHoneypotSignals([
       "diff --git \"a/src/generated prompt.ts\" \"b/src/generated prompt.ts\"",
       "+++ \"b/src/generated prompt.ts\"",
-      "+const marker = 'CLAWPTCHA_DO_NOT_ADD_THIS';",
+      "+const marker = 'VOUCHA_DO_NOT_ADD_THIS';",
       "",
     ].join("\n"), [signal]);
 

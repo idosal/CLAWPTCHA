@@ -1,4 +1,4 @@
-# CLAWPTCHA
+# VOUCHA
 
 A repo governance layer for GitHub PRs: maintainers choose which contributions
 need an accountability check before merge, from diff-specific questions to
@@ -9,15 +9,15 @@ attestation; maintainers get a behavioral risk report.
 
 ## How it works
 
-1. Install the GitHub App on a repo and add `.github/clawptcha.yml` if the
+1. Install the GitHub App on a repo and add `.github/voucha.yml` if the
    defaults are not your policy.
-2. When a PR opens, CLAWPTCHA resolves the repo's governance preferences:
+2. When a PR opens, VOUCHA resolves the repo's governance preferences:
    draft handling, optional PR-body accountability fields, maintainer/bot/path/
    size exemptions, team and repository-role trust, prior contributor history,
    trusted linked-issue exemptions, passive signals, and any configured gates.
 3. If a challenge is required, the PR author opens the link, verifies from the
    PR with a one-time GitHub comment, passes Turnstile, and completes the gate.
-   CLAWPTCHA first builds a cached PR investigation from the file map and selected patch
+   VOUCHA first builds a cached PR investigation from the file map and selected patch
    evidence, then generates the author-facing quiz from that artifact. Today
    the shipped gate is a multiple-choice quiz about intent, behavior, and
    blast radius. Turnstile and browser automation checks can fail the gate with
@@ -26,17 +26,17 @@ attestation; maintainers get a behavioral risk report.
 4. Pass (3 of 4 by default) → green check + attestation comment. Fail →
    15-minute cooldown, fresh quiz on retry, up to 3 attempts by default.
 5. The check run summary includes a risk report (timings, Turnstile verdict,
-   automation fingerprints). CLAWPTCHA never blocks merges on its own outages —
+   automation fingerprints). VOUCHA never blocks merges on its own outages —
    failures report `neutral`.
 
-## Configure per repo: `.github/clawptcha.yml`
+## Configure per repo: `.github/voucha.yml`
 
 All fields are optional; a maintainer typo in any single field falls back to
 that field's default rather than breaking the whole config (`src/config.ts`).
 The config is always read from the PR's **merge target** (base branch), never
 the PR branch itself, so a PR cannot weaken its own gate.
 
-Copy [templates/clawptcha.yml](templates/clawptcha.yml) when a repository wants
+Copy [templates/voucha.yml](templates/voucha.yml) when a repository wants
 the built-in defaults committed explicitly. The default template uses
 `draft_prs: ignore`, so draft PRs stay quiet until they are marked ready for
 review. Copy [templates/contributing-policy.md](templates/contributing-policy.md)
@@ -84,7 +84,7 @@ exemptions:
   - type: prior_merged_prs
     min_count: 3
 
-  # Optional. Reuses ordinary GitHub issue workflow; no CLAWPTCHA-specific
+  # Optional. Reuses ordinary GitHub issue workflow; no VOUCHA-specific
   # label is required when the linked issue already has a trusted signal.
   - type: linked_issue_match
     min_match_score: 0.7
@@ -96,7 +96,7 @@ signals:
   # Optional. Maintainer-authored literal canaries scanned only in added diff lines.
   - type: code_honeypot
     report_only: true
-    patterns: ["CLAWPTCHA_DO_NOT_ADD_THIS"]
+    patterns: ["VOUCHA_DO_NOT_ADD_THIS"]
     paths: ["src/**", "*.md"]
 
 max_attempts: 3
@@ -132,21 +132,23 @@ max_context_tokens: null
 output:
   comments: normal        # quiet | normal | detailed
   labels: true
+enforcement:
+  auto_close: false       # false | true, or { enabled: true, outcomes: [failed_final] }
 ```
 
 | Field | Default | Behavior |
 |---|---|---|
-| `gates` | `[{ type: "multiple_choice", questions: 4, pass_threshold: 3 }]` | Author-facing challenge stages. Today CLAWPTCHA supports `multiple_choice`, with `questions` as an integer 1–10 and `pass_threshold` capped at the question count. |
+| `gates` | `[{ type: "multiple_choice", questions: 4, pass_threshold: 3 }]` | Author-facing challenge stages. Today VOUCHA supports `multiple_choice`, with `questions` as an integer 1–10 and `pass_threshold` capped at the question count. |
 | `path_rules` | `[]` | First matching path-specific policy override. Supports `paths`, `gates`, `require_approval`, `max_attempts`, `cooldown_minutes`, `min_changed_lines`, `skip_paths`, and `include_paths`. |
-| `exemptions` | `[]` | Structured reasons no challenge is required. Today CLAWPTCHA supports `author_login`, `author_association`, `repository_permission`, `github_team`, `prior_merged_prs`, and `linked_issue_match`. |
-| `signals` | `[{ type: "honeypot", report_only: true }]` | Passive risk signals that appear in the maintainer report. Today CLAWPTCHA supports `honeypot`, an off-screen decoy form field that can flag broad automated form filling, and `code_honeypot`, maintainer-authored literal canary patterns scanned only in added diff lines. Set `signals: []` to disable passive honeypot collection. |
+| `exemptions` | `[]` | Structured reasons no challenge is required. Today VOUCHA supports `author_login`, `author_association`, `repository_permission`, `github_team`, `prior_merged_prs`, and `linked_issue_match`. |
+| `signals` | `[{ type: "honeypot", report_only: true }]` | Passive risk signals that appear in the maintainer report. Today VOUCHA supports `honeypot`, an off-screen decoy form field that can flag broad automated form filling, and `code_honeypot`, maintainer-authored literal canary patterns scanned only in added diff lines. Set `signals: []` to disable passive honeypot collection. |
 | `pass_threshold` | `3` | Legacy shortcut for the default multiple-choice gate's threshold when `gates` is omitted. New configs should prefer `gates[0].pass_threshold`. |
-| `max_attempts` | `3` | Integer, 1–10. Total quiz attempts allowed per challenge before the check becomes `failed_final` and stays failed for maintainers to review manually. |
+| `max_attempts` | `3` | Integer, 1–10. Total quiz attempts allowed per challenge before the check becomes `failed_final`; maintainers review manually unless `enforcement.auto_close` is enabled for that outcome. |
 | `cooldown_minutes` | `15` | Integer, ≥ 0. Minutes an author must wait after a failed (non-final) attempt before starting a retry. |
 | `draft_prs` | `"ignore"` | Enum: `challenge` \| `neutral` \| `ignore`. Controls whether draft PRs get the normal challenge, a neutral check, or no check. The default keeps drafts quiet until `ready_for_review`. |
-| `require_approval` | `"first_time"` | Enum: `first_time` \| `always` \| `never`. `first_time` requires maintainer approval (`/clawptcha approve` PR comment) only when the author's GitHub `author_association` is `FIRST_TIME_CONTRIBUTOR`, `FIRST_TIMER`, or `NONE`; `always` requires approval for every PR; `never` skips the approval gate entirely. An invalid value falls back to `first_time`. |
+| `require_approval` | `"first_time"` | Enum: `first_time` \| `always` \| `never`. `first_time` requires maintainer approval (`/voucha approve` PR comment) only when the author's GitHub `author_association` is `FIRST_TIME_CONTRIBUTOR`, `FIRST_TIMER`, or `NONE`; `always` requires approval for every PR; `never` skips the approval gate entirely. An invalid value falls back to `first_time`. |
 | `trust` | `{ default_author_associations: ["OWNER", "MEMBER", "COLLABORATOR"] }` | Built-in GitHub `author_association` classes that skip the challenge before other author, size, and path rules. Set `default_author_associations: []` when owners, members, and collaborators should take the challenge too. |
-| `accountability` | `{ require_pr_acknowledgement: false, require_ai_disclosure: false }` | Optional PR-body preflight. When enabled, CLAWPTCHA fails the check before creating a quiz unless the PR body has the configured acknowledgement and/or AI assistance disclosure line. |
+| `accountability` | `{ require_pr_acknowledgement: false, require_ai_disclosure: false }` | Optional PR-body preflight. When enabled, VOUCHA fails the check before creating a quiz unless the PR body has the configured acknowledgement and/or AI assistance disclosure line. |
 | `bot_policy` | `{ default: "skip", trusted_logins: [] }` | Structured bot handling. `default: challenge` lets repos challenge bots except named trusted bot logins. Legacy `skip_bots` maps into this when `bot_policy` is omitted. |
 | `rechallenge` | `{ on_push: "never", ignore_paths: [] }` | Structured push policy. `on_push` can be `never`, `always`, or `included_paths`; `ignore_paths` keeps low-risk pushes from invalidating a prior pass. `included_paths` uses the effective `include_paths`; when that list is empty it behaves like `always` so stale passes are not silently preserved. |
 | `min_changed_lines` | `10` | Diffs with fewer than this many changed lines (additions + deletions) are exempt ("diff below min_changed_lines"). |
@@ -155,6 +157,7 @@ output:
 | `context` | `{ strategy: "adaptive", investigator: "auto", map_tokens: 8000, detail_tokens: 24000, max_files: 12, max_model_calls: 3, ignore_paths: [], large_pr: { changed_files: 100, changed_lines: 5000 } }` | Controls PR investigation before quiz generation. `context.ignore_paths` removes low-signal files from quiz evidence without changing whether the PR is challenged. `context.investigator: auto` uses the Flue investigator for large PRs when configured. |
 | `max_context_tokens` | `null` | Legacy/direct-generation cap used when `context.strategy: truncate`. `null` = uncapped: the full diff is sent to the LLM (bounded only by the model's context window). If set to a positive integer, the diff sent to the LLM is truncated to roughly that many tokens (~4 chars/token estimate) and replaced past that point with a full list of changed filenames. Invalid values fall back to `null`. Adaptive fallback uses a bounded cap from `context.detail_tokens`; large/Flue investigation failures do not fall back to direct raw-diff generation. |
 | `output` | `{ comments: "normal", labels: true }` | Controls PR comment volume and whether flagged-pass labels are applied. `comments: quiet` relies on check-run output only; `detailed` includes risk detail in outcome comments. |
+| `enforcement` | `{ auto_close: { enabled: false, outcomes: ["failed_assisted", "failed_final"] } }` | Optional PR auto-close behavior. When enabled, VOUCHA closes PRs after configured terminal hard failures only; retryable failures and neutral service failures are never auto-closed. |
 
 Maintainers, repo admins, and users with `OWNER`/`MEMBER`/`COLLABORATOR`
 `author_association` are exempt by default through `trust.default_author_associations`
@@ -195,10 +198,10 @@ structured `author_login` exemption.
 ### Repository permission exemptions
 
 `repository_permission` lets a repo trust role or permission names returned by
-GitHub's collaborator permission API. CLAWPTCHA checks both GitHub's
+GitHub's collaborator permission API. VOUCHA checks both GitHub's
 `role_name` value, such as `maintain`, `admin`, or a custom repository role,
 and GitHub's legacy `permission` value, such as `write` or `read`. This reuses
-the same GitHub signal CLAWPTCHA already uses for maintainer approvals and
+the same GitHub signal VOUCHA already uses for maintainer approvals and
 trusted linked issues.
 
 ```yaml
@@ -207,7 +210,7 @@ exemptions:
     permissions: [write, maintain, admin]
 ```
 
-If GitHub cannot resolve the author's permission, CLAWPTCHA falls back to the
+If GitHub cannot resolve the author's permission, VOUCHA falls back to the
 configured `gates` rather than treating the author as trusted.
 
 Legacy configs can still use `skip_bots`; when `bot_policy` is omitted it maps
@@ -228,7 +231,7 @@ exemptions:
 ```
 
 This requires the GitHub App to have **Members: Read-only** organization
-permission. If membership cannot be resolved, CLAWPTCHA falls back to the gate.
+permission. If membership cannot be resolved, VOUCHA falls back to the gate.
 
 `prior_merged_prs` trusts contributors after they have enough merged pull
 requests in the same repository. This is useful for maintainers who want a
@@ -240,12 +243,12 @@ exemptions:
     min_count: 3
 ```
 
-CLAWPTCHA counts merged PRs with GitHub issue search. If GitHub search is
+VOUCHA counts merged PRs with GitHub issue search. If GitHub search is
 unavailable, the exemption does not match.
 
 ### Contributor accountability policy
 
-CLAWPTCHA is not an AI detector. It is an accountability gate: the author may
+VOUCHA is not an AI detector. It is an accountability gate: the author may
 use AI, but passing records that they personally understand, tested, and can
 support the PR. Repositories dealing with low-effort or unsupported PRs should
 also document that policy for humans, not only enforce it in YAML.
@@ -271,9 +274,9 @@ Use `yes`, `no`, `n/a`, or `none` for the AI assistance line.
 
 ### GitHub-native PR limits
 
-For high-volume repositories, pair CLAWPTCHA with GitHub's own contribution
+For high-volume repositories, pair VOUCHA with GitHub's own contribution
 controls: PR creation limits, trusted bypass lists, and temporary restrictions
-on who can open PRs. CLAWPTCHA should provide accountability and evidence for
+on who can open PRs. VOUCHA should provide accountability and evidence for
 PRs that reach review; GitHub-native controls should handle volume throttling.
 
 ### Linked issue exemptions
@@ -288,13 +291,13 @@ issue, and exempts the PR only when:
   `min_match_score`;
 - the issue is in the same repo, unless `require_same_repo: false` is set.
 
-If the issue is missing, untrusted, or only weakly related, CLAWPTCHA falls back
+If the issue is missing, untrusted, or only weakly related, VOUCHA falls back
 to the configured `gates`; it does not fail the PR for an uncertain exemption.
 
 ### PR investigation
 
 Quiz generation is intentionally two-step by default. On the first quiz start
-for a `(repo, PR, head_sha)`, CLAWPTCHA builds a compact investigation artifact
+for a `(repo, PR, head_sha)`, VOUCHA builds a compact investigation artifact
 from PR metadata, the paginated changed-file list, and selected patch evidence.
 That artifact records intent, behavior changes, affected surfaces, risk areas,
 evidence paths, unknowns, quiz anchors, confidence, and whether the PR crossed
@@ -311,13 +314,13 @@ Flue investigator service in `flue-investigator/`, which exposes
 `POST /workflows/investigate-pr?wait=result` through a Cloudflare service
 binding. The main Worker calls it with a bounded PR evidence bundle. GitHub
 installation tokens are never sent to Flue or stored in workflow payloads.
-CLAWPTCHA stores only the validated artifact in D1.
+VOUCHA stores only the validated artifact in D1.
 
 After the Flue Worker exists, configure the main Worker with a service binding:
 
 ```jsonc
 "services": [
-  { "binding": "FLUE_INVESTIGATOR", "service": "clawptcha-flue-investigator" }
+  { "binding": "FLUE_INVESTIGATOR", "service": "voucha-flue-investigator" }
 ]
 ```
 
@@ -325,7 +328,7 @@ Configure the optional Flue model override on the Flue investigator Worker if
 needed:
 
 ```text
-CLAWPTCHA_FLUE_MODEL=cloudflare/@cf/zai-org/glm-4.7-flash
+VOUCHA_FLUE_MODEL=cloudflare/@cf/zai-org/glm-4.7-flash
 ```
 
 The Flue Worker is service-binding-only; it disables `workers.dev` and does
@@ -339,11 +342,11 @@ through the direct prompt path.
 
 `honeypot` renders an off-screen, unfocusable decoy text field in challenge
 forms. A normal author should never touch it. If broad form-filling automation
-submits a value, CLAWPTCHA records "a hidden form field was submitted" in the
+submits a value, VOUCHA records "a hidden form field was submitted" in the
 risk report.
 
 `code_honeypot` lets maintainers configure literal canary strings that should
-never be introduced by a careful contributor. CLAWPTCHA scans the PR's unified
+never be introduced by a careful contributor. VOUCHA scans the PR's unified
 diff and only matches added lines in the configured `paths`; removed lines and
 context lines do not count. If an added line contains a canary, the risk report
 records "the PR introduced a configured code honeypot marker" without exposing
@@ -355,14 +358,14 @@ are report-only. A filled form honeypot or matched code canary never changes
 the quiz score and never silently fails an otherwise correct challenge on its
 own.
 
-When a passed quiz has multiple passive risk signals, CLAWPTCHA marks the check
+When a passed quiz has multiple passive risk signals, VOUCHA marks the check
 title and PR comment, and best-effort creates/applies the
 `pr-comprehension:flagged` label so maintainers can spot it from the PR list.
 
 ### Path scope
 
 Use `skip_paths` to exempt PRs where every changed file is low-risk, such as
-docs-only changes. Use `include_paths` when CLAWPTCHA should only run for core
+docs-only changes. Use `include_paths` when VOUCHA should only run for core
 directories:
 
 ```yaml
@@ -390,12 +393,12 @@ segment (split on `/`) — no regex, so it can't backtrack pathologically:
 
 ## Deploy
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/CLAWPTCHA)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/idosal/VOUCHA)
 
-Local CLI setup requires Node.js 22.22.1+ and npm. CLAWPTCHA uses Vite with
+Local CLI setup requires Node.js 22.22.1+ and npm. VOUCHA uses Vite with
 Cloudflare's Workers plugin for local development and build output.
 
-CLAWPTCHA is currently self-deployed. The managed GitHub App is not public yet;
+VOUCHA is currently self-deployed. The managed GitHub App is not public yet;
 the shareable path is to deploy the Worker and create a GitHub App in your own
 GitHub account through the setup wizard.
 
@@ -443,8 +446,9 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
 2. **Create a GitHub App** (github.com → Settings → Developer settings → GitHub Apps):
    - Webhook URL: `https://<your-worker>/webhook`; webhook secret = the value
      you'll put in `GITHUB_WEBHOOK_SECRET`.
-   - Permissions: **Checks: Read & write**, **Pull requests: Read & write**,
-     **Contents: Read-only**, **Metadata: Read-only**, and **Members:
+   - Permissions: **Checks: Read & write**, **Pull requests: Read & write**
+     (comments and optional auto-close), **Contents: Read-only**, **Metadata:
+     Read-only**, and **Members:
      Read-only**. Members read is used by `github_team` exemptions and is
      harmless if the repository does not configure them.
    - Subscribe to events: **Pull request**, **Issue comment**, **Installation**.
@@ -460,9 +464,10 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
 
 3. **Create a Cloudflare Turnstile widget** (Cloudflare dashboard → Turnstile)
    for the domain the Worker will be served from. Note the site key and
-   secret key.
+   secret key. Do not use Cloudflare's public testing site keys in production;
+   they deliberately render a testing label in the browser.
 
-4. **Configure the LLM provider** (`vars` in `wrangler.jsonc`) and **set the
+4. **Configure public settings** (`vars` in `wrangler.jsonc`) and **set the
    secrets** (`wrangler secret put <NAME>`), matching `Env` in `src/types.ts`:
 
    Most self-hosters should keep the default `workers-ai` — it needs no
@@ -480,11 +485,17 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
      vLLM). Set `LLM_BASE_URL` (e.g. `https://api.openai.com/v1`),
      `LLM_MODEL`, and secret `LLM_API_KEY` if the endpoint needs one.
 
-   Secrets (6, or 7 with `LLM_API_KEY`):
+   Public vars:
+   - `APP_BASE_URL`
+   - `TURNSTILE_SITE_KEY` (public; it is embedded in the challenge page HTML)
+   - `LLM_PROVIDER`
+   - `LLM_MODEL`
+   - `AI_GATEWAY_ID` (optional, for Workers AI spend caps and analytics)
+
+   Secrets (5, or 6 with `LLM_API_KEY`):
    - `GITHUB_APP_ID`
    - `GITHUB_PRIVATE_KEY` (PKCS#8 PEM from step 2)
    - `GITHUB_WEBHOOK_SECRET`
-   - `TURNSTILE_SITE_KEY`
    - `TURNSTILE_SECRET_KEY`
    - `SESSION_SIGNING_KEY` (random 32+ bytes, hex — signs the session cookie)
    - `LLM_API_KEY` (only for `anthropic` / keyed `openai-compat`)
@@ -502,7 +513,7 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
    Then uncomment the `FLUE_INVESTIGATOR` service binding example in
    `wrangler.jsonc` and redeploy the main Worker.
    The Flue Worker uses Workers AI through its `AI` binding and defaults to
-   `cloudflare/@cf/zai-org/glm-4.7-flash`; set `CLAWPTCHA_FLUE_MODEL` on the
+   `cloudflare/@cf/zai-org/glm-4.7-flash`; set `VOUCHA_FLUE_MODEL` on the
    Flue Worker if you want a different Flue model.
 
 6. **Background sweeps.**
@@ -532,7 +543,7 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
 - Before a quiz attempt starts, the contributor must accept a short challenge
   terms acknowledgement. If they do not accept, no quiz attempt is created and
   no answer or challenge telemetry is collected.
-- The visible CLAWPTCHA outcome is posted on the pull request in the same vein
+- The visible VOUCHA outcome is posted on the pull request in the same vein
   as CI checks, branch-protection gates, review comments, and the contribution
   itself. Detailed answer selections and summary telemetry remain audit data
   for maintainers rather than a separate public profile.
@@ -552,7 +563,7 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
 
 - **Not an unbeatable gate.** A contributor whose coding agent has computer
   use (e.g. an agent that can drive a browser) can have that agent take the
-  quiz itself. CLAWPTCHA does not claim to prevent this — the product is
+  quiz itself. VOUCHA does not claim to prevent this — the product is
   attestation (making a pass a deliberate, on-the-record claim of
   understanding) plus a behavioral risk report for maintainers, not a proof
   of humanness.
@@ -574,7 +585,7 @@ If you prefer doing it by hand, or a wizard phase fails and points you here:
 - **PR comment lookup is not paginated.** `upsertPrComment`'s
   existing-comment lookup requests a single page (`per_page=100`). PRs with
   more than 100 existing issue comments on the thread may fail to find/update
-  CLAWPTCHA's own tracked comment and may get a duplicate comment.
+  VOUCHA's own tracked comment and may get a duplicate comment.
 
 ## Manual E2E verification checklist
 
@@ -583,10 +594,10 @@ cannot run in CI. Walk each scenario and record the outcome:
 
 - [ ] Open a PR from a non-maintainer account → check goes `queued`, a PR
       comment appears, status is `awaiting_approval`.
-- [ ] Comment `/clawptcha approve` from a maintainer account → the comment
+- [ ] Comment `/voucha approve` from a maintainer account → the comment
       updates with the challenge link.
 - [ ] Open the link, use "Copy command and open PR", paste the one-time
-      `/clawptcha verify <code>` command as the PR author, return to the
+      `/voucha verify <code>` command as the PR author, return to the
       auto-advanced challenge tab, pass Turnstile, answer the quiz → green
       check, attestation comment posted, risk report visible in the check run
       details.
