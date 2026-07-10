@@ -12,7 +12,7 @@
     // database only exists after deploy; the brief unmigrated window on a
     // first deploy is cushioned by the app's fail-open behavior.
     // Tests auto-generate a temp config with a dummy id (see vitest.config.ts).
-    { "binding": "DB", "database_name": "clawptcha" }
+    { "binding": "DB", "database_name": "voucha" }
   ],
   "assets": {
     "binding": "ASSETS",
