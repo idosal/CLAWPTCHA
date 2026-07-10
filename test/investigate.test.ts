@@ -74,6 +74,19 @@ describe("buildInvestigationPrompt", () => {
     expect(investigationMode(ctx, DEFAULT_CONFIG)).toBe("large_pr");
     expect(buildInvestigationPrompt(ctx, DEFAULT_CONFIG)).toContain("Investigation mode: large_pr");
   });
+
+  it("limits a follow-up investigation to the delta after the passed head", () => {
+    const prompt = buildInvestigationPrompt({
+      diff: "DELTA_DIFF",
+      title: "Full PR title",
+      body: "Full PR body",
+      files: ["follow-up.ts"],
+      deltaBaseSha: "passed-sha",
+    }, DEFAULT_CONFIG);
+
+    expect(prompt).toContain("Follow-up scope: commits after passed head passed-sha");
+    expect(prompt).toContain("Investigate only this follow-up delta");
+  });
 });
 
 describe("investigatePr", () => {

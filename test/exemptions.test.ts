@@ -289,25 +289,25 @@ describe("evaluateExemption", () => {
   it("decides rechallenge on push from structured policy", () => {
     expect(shouldRechallengeOnPush({
       ...DEFAULT_CONFIG,
-      rechallenge: { on_push: "always", ignore_paths: ["docs/**"] },
+      rechallenge: { ...DEFAULT_CONFIG.rechallenge, on_push: "always", ignore_paths: ["docs/**"] },
     }, ["docs/guide.md"])).toBe(false);
 
     expect(shouldRechallengeOnPush({
       ...DEFAULT_CONFIG,
       include_paths: ["src/core/**"],
-      rechallenge: { on_push: "included_paths", ignore_paths: [] },
+      rechallenge: { ...DEFAULT_CONFIG.rechallenge, on_push: "included_paths", ignore_paths: [] },
     }, ["src/core/service.ts"])).toBe(true);
 
     expect(shouldRechallengeOnPush({
       ...DEFAULT_CONFIG,
       include_paths: ["src/core/**"],
-      rechallenge: { on_push: "included_paths", ignore_paths: [] },
+      rechallenge: { ...DEFAULT_CONFIG.rechallenge, on_push: "included_paths", ignore_paths: [] },
     }, ["docs/guide.md"])).toBe(false);
 
     expect(shouldRechallengeOnPush({
       ...DEFAULT_CONFIG,
       include_paths: [],
-      rechallenge: { on_push: "included_paths", ignore_paths: [] },
+      rechallenge: { ...DEFAULT_CONFIG.rechallenge, on_push: "included_paths", ignore_paths: [] },
     }, ["docs/guide.md"])).toBe(true);
   });
 

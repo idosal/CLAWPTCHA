@@ -46,12 +46,16 @@ export function capContext(diff: string, files: string[], maxContextTokens: numb
 
 export function buildGenerationPrompt(
   diff: string, title: string, body: string | null, files: string[],
-  maxContextTokens: number | null, questionCount = 4
+  maxContextTokens: number | null, questionCount = 4, deltaBaseSha?: string
 ): string {
   return [
     `PR title: ${title}`,
     `PR description:\n${body ?? "(none)"}`,
     `Changed files: ${files.join(", ")}`,
+    ...(deltaBaseSha ? [
+      `Follow-up scope: commits after passed head ${deltaBaseSha}`,
+      "Ask only about this follow-up delta. Do not retest changes already covered by the passed head.",
+    ] : []),
     "",
     "Diff:",
     "```diff",
@@ -125,9 +129,18 @@ export async function generateQuiz(
   files: string[],
   maxContextTokens: number | null,
   questionCount = 4,
-  attempts = 2
+  attempts = 2,
+  deltaBaseSha?: string
 ): Promise<GenerateResult> {
-  const prompt = buildGenerationPrompt(diff, title, body, files, maxContextTokens, questionCount);
+  const prompt = buildGenerationPrompt(
+    diff,
+    title,
+    body,
+    files,
+    maxContextTokens,
+    questionCount,
+    deltaBaseSha
+  );
   return generateQuizWithPrompt(provider, prompt, questionCount, attempts);
 }
 
@@ -136,12 +149,17 @@ export function buildInvestigatedGenerationPrompt(
   title: string,
   body: string | null,
   files: string[],
-  questionCount = 4
+  questionCount = 4,
+  deltaBaseSha?: string
 ): string {
   return [
     `PR title: ${title}`,
     `PR description:\n${body ?? "(none)"}`,
     `Changed files: ${files.join(", ")}`,
+    ...(deltaBaseSha ? [
+      `Follow-up scope: commits after passed head ${deltaBaseSha}`,
+      "Ask only about this follow-up delta. Do not retest changes already covered by the passed head.",
+    ] : []),
     "",
     "Investigation artifact:",
     "```json",
@@ -164,8 +182,16 @@ export async function generateQuizFromInvestigation(
   body: string | null,
   files: string[],
   questionCount = 4,
-  attempts = 2
+  attempts = 2,
+  deltaBaseSha?: string
 ): Promise<GenerateResult> {
-  const prompt = buildInvestigatedGenerationPrompt(investigation, title, body, files, questionCount);
+  const prompt = buildInvestigatedGenerationPrompt(
+    investigation,
+    title,
+    body,
+    files,
+    questionCount,
+    deltaBaseSha
+  );
   return generateQuizWithPrompt(provider, prompt, questionCount, attempts);
 }

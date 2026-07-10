@@ -45,6 +45,58 @@ describe("GitHubApi", () => {
     expect((init!.headers as Record<string, string>).accept).toBe("application/vnd.github.diff");
   });
 
+  it("compares two commit heads and returns the changed-file delta", async () => {
+    const f = mockFetch(200, {
+      status: "ahead",
+      ahead_by: 2,
+      behind_by: 0,
+      total_commits: 2,
+      files: [{
+        filename: "src/new-behavior.ts",
+        status: "modified",
+        additions: 8,
+        deletions: 3,
+        changes: 11,
+        patch: "@@ -1 +1 @@\n-old\n+new",
+      }],
+    });
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+
+    const comparison = await api.compareCommits("o/r", "passed-sha", "new-sha");
+
+    expect(comparison).toEqual({
+      status: "ahead",
+      aheadBy: 2,
+      behindBy: 0,
+      totalCommits: 2,
+      files: [{
+        filename: "src/new-behavior.ts",
+        status: "modified",
+        additions: 8,
+        deletions: 3,
+        changes: 11,
+        patch: "@@ -1 +1 @@\n-old\n+new",
+      }],
+    });
+    expect(String(f.mock.calls[0][0])).toBe(
+      "https://api.github.com/repos/o/r/compare/passed-sha...new-sha"
+    );
+  });
+
+  it("fetches only the diff between two commit heads", async () => {
+    const f = mockFetch(200, "diff --git a/new.ts b/new.ts\n+delta");
+    const api = new GitHubApi("tok", f as unknown as typeof fetch);
+
+    const diff = await api.getCommitComparisonDiff("o/r", "passed-sha", "new-sha");
+
+    expect(diff).toContain("+delta");
+    expect(String(f.mock.calls[0][0])).toBe(
+      "https://api.github.com/repos/o/r/compare/passed-sha...new-sha"
+    );
+    expect((f.mock.calls[0][1]!.headers as Record<string, string>).accept)
+      .toBe("application/vnd.github.diff");
+  });
+
   it("paginates PR file details", async () => {
     const firstPage = Array.from({ length: 100 }, (_, i) => ({
       filename: `src/${i}.ts`,

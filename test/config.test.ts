@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import defaultTemplateYaml from "../templates/voucha.yml?raw";
 import {
   getAuthorAssociationExemptions,
+  applyRechallengeGate,
   getGitHubTeamExemptions,
   getAuthorLoginExemptions,
   getLinkedIssueMatchExemption,
@@ -20,6 +21,11 @@ describe("parseConfig", () => {
   it("returns defaults for null/empty input", () => {
     expect(parseConfig(null)).toEqual(DEFAULT_CONFIG);
     expect(parseConfig("")).toEqual(DEFAULT_CONFIG);
+    expect(DEFAULT_CONFIG.rechallenge).toEqual({
+      on_push: "included_paths",
+      ignore_paths: ["docs/**", "*.md"],
+      questions: 2,
+    });
   });
 
   it("keeps the default repository template in sync with DEFAULT_CONFIG", () => {
@@ -210,6 +216,7 @@ describe("parseConfig", () => {
       "rechallenge:",
       "  on_push: included_paths",
       "  ignore_paths: ['docs/**', 'docs/**']",
+      "  questions: 2",
       "output:",
       "  comments: detailed",
       "  labels: false",
@@ -222,7 +229,11 @@ describe("parseConfig", () => {
     expect(cfg.skip_bots).toBe(false);
     expect(cfg.bot_policy).toEqual({ default: "challenge", trusted_logins: ["dependabot[bot]"] });
     expect(cfg.rechallenge_on_push).toBe(true);
-    expect(cfg.rechallenge).toEqual({ on_push: "included_paths", ignore_paths: ["docs/**"] });
+    expect(cfg.rechallenge).toEqual({
+      on_push: "included_paths",
+      ignore_paths: ["docs/**"],
+      questions: 2,
+    });
     expect(cfg.output).toEqual({ comments: "detailed", labels: false });
     expect(cfg.context.ignore_paths).toEqual(["dist/**", "*.lock"]);
   });
@@ -293,6 +304,31 @@ describe("parseConfig", () => {
   it("maps legacy bot and rechallenge booleans into structured policies", () => {
     expect(parseConfig("skip_bots: false\n").bot_policy.default).toBe("challenge");
     expect(parseConfig("rechallenge_on_push: true\n").rechallenge.on_push).toBe("always");
+  });
+
+  it("keeps low-risk delta defaults when rechallenge is only partially configured", () => {
+    expect(parseConfig([
+      "rechallenge:",
+      "  on_push: included_paths",
+      "",
+    ].join("\n")).rechallenge).toEqual({
+      on_push: "included_paths",
+      ignore_paths: ["docs/**", "*.md"],
+      questions: 2,
+    });
+  });
+
+  it("keeps ignored reset paths out of a follow-up quiz context", () => {
+    const cfg = parseConfig([
+      "rechallenge:",
+      "  on_push: always",
+      "  ignore_paths: ['docs/**']",
+      "context:",
+      "  ignore_paths: ['dist/**']",
+      "",
+    ].join("\n"));
+
+    expect(applyRechallengeGate(cfg).context.ignore_paths).toEqual(["dist/**", "docs/**"]);
   });
 
   it("parses skip lists and max_context_tokens", () => {
@@ -409,7 +445,7 @@ describe("parseConfig", () => {
     expect(b.context.large_pr.changed_files).toBe(100);
     expect(b.context.ignore_paths).toEqual([]);
     expect(b.bot_policy.trusted_logins).toEqual([]);
-    expect(b.rechallenge.ignore_paths).toEqual([]);
+    expect(b.rechallenge.ignore_paths).toEqual(["docs/**", "*.md"]);
     expect(b.enforcement).toEqual({
       auto_close: {
         enabled: false,

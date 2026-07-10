@@ -38,6 +38,10 @@ describe("challenge pages", () => {
     expect(html).toContain("Challenge required");
     expect(html).toContain("Screen the PR");
     expect(html).toContain("Review the record");
+    expect(html).toContain("Questions maintainers ask.");
+    expect(html).toContain("How does this fit with code review, CI, and branch protection?");
+    expect(html).toContain("Is this a quiz, or a governance layer?");
+    expect(html).toContain('href="/docs/challenge-lifecycle/"');
     expect(html).toContain('href="/docs/"');
     expect(html).toContain('href="https://github.com/apps/voucha-app/installations/new"');
     expect(html).not.toContain("Open the Starlight docs");
@@ -62,6 +66,10 @@ describe("challenge pages", () => {
     expect(start).toContain("Reading the pull request");
     expect(start).toContain("Generating PR-specific questions");
     expect(start).toContain("First runs and larger diffs can take a little longer.");
+    expect(start).toContain('data-callback="vouchaTurnstileReady"');
+    expect(start).toContain('data-expired-callback="vouchaTurnstileExpired"');
+    expect(start).toContain('<button class="btn" type="submit" id="startButton" disabled>Verifying browser...</button>');
+    expect(start).toContain("window.vouchaTurnstileVerified = false");
     expect(questionHtml).toContain(`name="${HONEYPOT_FIELD_NAME}"`);
     expect(questionHtml).toContain('tabindex="-1"');
     expect(start).toContain("Bot verification failures stop the challenge");
@@ -79,6 +87,10 @@ describe("challenge pages", () => {
     expect(html).toContain('id="copyCommandButton"');
     expect(html).toContain('aria-label="Copy verification command"');
     expect(html).toContain(">Copy</button>");
+    expect(html).toContain("grid-template-columns:minmax(0,1fr) auto");
+    expect(html).toContain("white-space:pre");
+    expect(html).toContain("body:not(.site-body) .verify-actions > .btn-secondary");
+    expect(html).toContain(".command-copy-button.btn-secondary{width:auto; min-width:76px}");
     expect(html).toContain('id="openPrLink"');
     expect(html).toContain("Open PR");
     expect(html).toContain("Waiting for your GitHub comment.");

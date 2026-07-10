@@ -76,8 +76,8 @@ const scriptedTelemetry: Telemetry = {
 function passedChallenge(): Challenge {
   return {
     id: "ch-1", installation_id: 1, repo_full_name: "o/r", pr_number: 1,
-    head_sha: "sha-1", author_login: "alice", check_run_id: 42, status: "passed",
-    approved_by: null, attempts_used: 1, cooldown_until: null,
+    head_sha: "sha-1", delta_base_sha: null, author_login: "alice", check_run_id: 42, status: "passed",
+    approved_by: null, attempts_used: 1, retry_cycle: 0, cooldown_until: null,
     config_json: "{}", auto_closed_at: null, terminal_reconciled_at: null,
     created_at: "2026-07-02T10:00:00.000Z",
   };

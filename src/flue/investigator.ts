@@ -142,6 +142,7 @@ export async function investigatePrWithFlue(
         body: ctx.body,
         changed_files: ctx.filePatches?.length ?? ctx.files.length,
         changed_lines: ctx.changedLines ?? null,
+        delta_base_sha: ctx.deltaBaseSha ?? null,
         mode,
       },
       files: filePayload(ctx.filePatches, cfg),

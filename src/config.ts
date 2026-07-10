@@ -67,8 +67,9 @@ const DEFAULT_BOT_POLICY = Object.freeze({
 });
 
 const DEFAULT_RECHALLENGE = Object.freeze({
-  on_push: "never" as const,
-  ignore_paths: Object.freeze([] as string[]),
+  on_push: "included_paths" as const,
+  ignore_paths: Object.freeze(["docs/**", "*.md"] as string[]),
+  questions: 2,
 });
 
 const DEFAULT_DRAFT_PRS = "ignore" as const;
@@ -246,13 +247,15 @@ const contextSchema = z.object({
 
 const rechallengeSchema = z.object({
   on_push: z.enum(["never", "always", "included_paths"]).catch(DEFAULT_RECHALLENGE.on_push),
-  ignore_paths: pathList().catch(() => []),
+  ignore_paths: pathList().catch(() => [...DEFAULT_RECHALLENGE.ignore_paths]),
+  questions: z.number().int().min(1).max(10).catch(DEFAULT_RECHALLENGE.questions),
 }).transform((policy) => ({
   ...policy,
   ignore_paths: normalizeStringList(policy.ignore_paths),
 })).catch(() => ({
   on_push: DEFAULT_RECHALLENGE.on_push,
   ignore_paths: [...DEFAULT_RECHALLENGE.ignore_paths],
+  questions: DEFAULT_RECHALLENGE.questions,
 }));
 
 const outputSchema = z.object({
@@ -480,7 +483,11 @@ function normalizeConfig(
   }
   cfg.skip_bots = cfg.bot_policy.default === "skip";
 
-  if (!raw || !Object.hasOwn(raw, "rechallenge")) {
+  if (
+    raw &&
+    !Object.hasOwn(raw, "rechallenge") &&
+    Object.hasOwn(raw, "rechallenge_on_push")
+  ) {
     cfg.rechallenge = {
       ...cfg.rechallenge,
       on_push: parsed.rechallenge_on_push ? "always" : "never",
@@ -566,6 +573,31 @@ export const DEFAULT_CONFIG: VouchaConfig = freezeConfig(freshDefaults());
 
 export function getMultipleChoiceGate(cfg: VouchaConfig): MultipleChoiceGate {
   return cfg.gates.find((gate) => gate.type === "multiple_choice") ?? { ...DEFAULT_MULTIPLE_CHOICE_GATE };
+}
+
+export function applyRechallengeGate(cfg: VouchaConfig): VouchaConfig {
+  const gates = cfg.gates.map((gate) => {
+    if (gate.type !== "multiple_choice") return { ...gate };
+    const questions = Math.min(gate.questions, cfg.rechallenge.questions);
+    return {
+      ...gate,
+      questions,
+      pass_threshold: Math.min(gate.pass_threshold, questions),
+    };
+  });
+  const multipleChoice = gates.find((gate) => gate.type === "multiple_choice");
+  return {
+    ...cfg,
+    gates,
+    context: {
+      ...cfg.context,
+      ignore_paths: unique([
+        ...cfg.context.ignore_paths,
+        ...cfg.rechallenge.ignore_paths,
+      ]),
+    },
+    pass_threshold: multipleChoice?.pass_threshold ?? cfg.pass_threshold,
+  };
 }
 
 export function shouldAutoClosePr(cfg: VouchaConfig, outcome: string): outcome is AutoCloseOutcome {

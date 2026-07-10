@@ -56,10 +56,14 @@ bot_policy:
   trusted_logins: []
 
 rechallenge:
-  on_push: never
-# Use included_paths only with include_paths. If include_paths is empty,
-# included_paths behaves like always so stale passes are not silently preserved.
-  ignore_paths: []
+  # Compare the last passed head with each new head. Reset only when that
+  # commit delta reaches included paths; with no include_paths, reset on any
+  # non-ignored delta.
+  on_push: included_paths
+# If include_paths is empty, included_paths resets on every non-ignored delta
+# so stale passes are not silently preserved.
+  ignore_paths: ["docs/**", "*.md"]
+  questions: 2 # Maximum follow-up questions; never expands the main gate.
 
 min_changed_lines: 10
 skip_paths: ["docs/**", "*.md"]

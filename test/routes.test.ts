@@ -168,6 +168,54 @@ describe("GET /challenge/:id", () => {
     expect(html).toContain('href="/challenge/chPassedActions"');
   });
 
+  it("renders assisted failures as failed results instead of stale challenges", async () => {
+    await testEnv.DB.prepare(
+      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
+        author_login, status, config_json) VALUES ('chAssistedFailure', 1, 'o/r', 7, 's7', 'alice', 'failed_assisted', '{}')`
+    ).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO quizzes (id, challenge_id, attempt_number, questions_json, score, turnstile_ok, telemetry_json)
+       VALUES ('quizAssistedFailure', 'chAssistedFailure', 1, '{"questions":[]}', 0, 0,
+         '{"botFailureReason":"Turnstile did not validate this browser session."}')`
+    ).run();
+
+    const res = await worker.fetch(
+      new Request("https://x/challenge/chAssistedFailure"),
+      testEnv,
+      createExecutionContext()
+    );
+
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('<h1 id="result-title">Bot verification failed</h1>');
+    expect(html).toContain("Bot verification failed: Turnstile did not validate this browser session.");
+    expect(html).not.toContain("Challenge no longer active");
+  });
+
+  it("renders the latest maintainer retry cycle result", async () => {
+    await testEnv.DB.prepare(
+      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
+        author_login, status, config_json, retry_cycle)
+       VALUES ('chRetryResult', 1, 'o/r', 8, 's8', 'alice', 'passed', '{}', 1)`
+    ).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO quizzes (id, challenge_id, attempt_number, retry_cycle, questions_json, answers_json, score)
+       VALUES ('quizOldCycle', 'chRetryResult', 3, 0, '{"questions":[]}', '[0,0,0,0]', 0),
+              ('quizNewCycle', 'chRetryResult', 1, 1, '{"questions":[]}', '[0,1,2,3]', 4)`
+    ).run();
+
+    const res = await worker.fetch(
+      new Request("https://x/challenge/chRetryResult"),
+      testEnv,
+      createExecutionContext()
+    );
+
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('<h1 id="result-title">Passed</h1>');
+    expect(html).toContain('<div class="score">4<span class="of">/4</span></div>');
+  });
+
   it("does not render Cloudflare testing site keys on production challenge pages", async () => {
     await testEnv.DB.prepare(
       `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
@@ -220,6 +268,37 @@ describe("POST /challenge/:id/start", () => {
     expect(html).toContain("Accept the challenge terms to begin.");
     expect(html).toContain('name="terms_acceptance"');
     const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id='chTerms'")
+      .first<{ count: number }>();
+    expect(row?.count).toBe(0);
+  });
+
+  it("keeps the challenge ready when browser verification has not produced a token", async () => {
+    await testEnv.DB.prepare(
+      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
+        author_login, status, config_json) VALUES ('chMissingTurnstile', 1, 'o/r', 4, 's4', 'alice', 'ready', '{}')`
+    ).run();
+    await testEnv.DB.prepare(
+      "INSERT INTO sessions (id, challenge_id, gh_login) VALUES ('sessMissingTurnstile', 'chMissingTurnstile', 'alice')"
+    ).run();
+    const cookie = await signSessionCookie(testEnv.SESSION_SIGNING_KEY, "sessMissingTurnstile");
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(new Request("https://x/challenge/chMissingTurnstile/start", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: `voucha_session=${cookie}`,
+      },
+      body: new URLSearchParams({ terms_acceptance: "accepted" }),
+    }), testEnv, ctx);
+
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("Complete browser verification before starting the challenge.");
+    const challenge = await testEnv.DB.prepare(
+      "SELECT status, attempts_used FROM challenges WHERE id='chMissingTurnstile'"
+    ).first<{ status: string; attempts_used: number }>();
+    expect(challenge).toEqual({ status: "ready", attempts_used: 0 });
+    const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id='chMissingTurnstile'")
       .first<{ count: number }>();
     expect(row?.count).toBe(0);
   });
@@ -287,6 +366,34 @@ describe("challengeDeps.generateQuiz fail-open seam", () => {
       expect(row).toEqual({ source: "flue", status: "failed" });
     } finally {
       errorSpy.mockRestore();
+    }
+  });
+});
+
+describe("challengeDeps.verifyTurnstile", () => {
+  it("treats an invalid secret as a VOUCHA outage", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      "error-codes": ["invalid-input-secret"],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(challengeDeps(testEnv).verifyTurnstile("token")).resolves.toBe("unavailable");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps a rejected browser token as a failed verification", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      "error-codes": ["invalid-input-response"],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(challengeDeps(testEnv).verifyTurnstile("token")).resolves.toBe("failed");
+    } finally {
+      vi.unstubAllGlobals();
     }
   });
 });

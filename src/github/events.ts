@@ -3,6 +3,7 @@ import type { GitHubApi } from "./api";
 import {
   getCodeHoneypotSignals,
   getLinkedIssueMatchExemption,
+  applyRechallengeGate,
   parseConfig,
   resolveConfig,
   type VouchaConfig,
@@ -19,8 +20,8 @@ import {
 } from "../policy/exemptions";
 import { evaluateLinkedIssueExemption } from "../policy/linked-issue";
 import {
-  getChallengeByPr, getLatestChallengeForPr, hasPassedChallenge,
-  insertChallenge, setChallengeStatus, supersedeOldChallenges,
+  getChallengeByPr, getLatestChallengeForPr, getLatestPassedChallenge,
+  insertChallenge, restartChallengeForRetry, setChallengeStatus, supersedeOldChallenges,
   updateChallengeCheckRun, randomToken, verifySessionFromComment,
 } from "../store";
 import { hasWriteRepositoryAccess } from "./permissions";
@@ -68,8 +69,22 @@ function commentsEnabled(cfg: VouchaConfig): boolean {
   return cfg.output.comments !== "quiet";
 }
 
-function commentBody(env: Env, challengeId: string, status: string, cfg: VouchaConfig, authorLogin: string): string {
+async function commentAuthorCanMaintain(api: GitHubApi, repo: string, payload: any): Promise<boolean> {
+  const association = String(payload.comment.author_association ?? "").toUpperCase();
+  if (["OWNER", "MEMBER", "COLLABORATOR"].includes(association)) return true;
+  return hasWriteRepositoryAccess(await api.getUserPermission(repo, payload.comment.user.login));
+}
+
+function commentBody(
+  env: Env,
+  challengeId: string,
+  status: string,
+  cfg: VouchaConfig,
+  authorLogin: string,
+  deltaBaseSha?: string | null
+): string {
   const url = challengeUrl(env, challengeId);
+  const shortDeltaBase = deltaBaseSha?.slice(0, 12);
   if (status === "awaiting_approval") {
     return [
       "## VOUCHA",
@@ -78,7 +93,9 @@ function commentBody(env: Env, challengeId: string, status: string, cfg: VouchaC
       "",
       "> Maintainers: comment `/voucha approve` to unlock the challenge.",
       "",
-      `Once approved, the author takes a short quiz about this change: ${url}`,
+      shortDeltaBase
+        ? `Once approved, the author takes a short follow-up quiz about changes since ${shortDeltaBase}: ${url}`
+        : `Once approved, the author takes a short quiz about this change: ${url}`,
       "",
       "_AI assistance in authoring is allowed. Challenge answers must come from the author's own understanding. Passing posts a public attestation that the author personally understands, tested, and can support this change._",
     ].join("\n");
@@ -86,13 +103,17 @@ function commentBody(env: Env, challengeId: string, status: string, cfg: VouchaC
   return [
     "## VOUCHA",
     "",
-    `@${authorLogin}: take a short comprehension quiz about this change to turn the check green (${cfg.max_attempts} attempts max):`,
+    shortDeltaBase
+      ? `@${authorLogin}: take a short follow-up quiz about changes since ${shortDeltaBase} to turn the check green (${cfg.max_attempts} attempts max):`
+      : `@${authorLogin}: take a short comprehension quiz about this change to turn the check green (${cfg.max_attempts} attempts max):`,
     "",
     `➡️ **[Start the challenge](${url})**`,
     "",
     "The challenge page copies the one-time verification command, opens this PR, and continues automatically after your comment lands.",
     "",
-    "_AI assistance in authoring is allowed. Challenge answers must come from your own understanding. Passing posts a public attestation that you personally understand, tested, and can support this change. The quiz is generated from the diff; answers are graded automatically._",
+    shortDeltaBase
+      ? "_AI assistance in authoring is allowed. Challenge answers must come from your own understanding. This follow-up quiz is generated only from the commits after your previous pass; answers are graded automatically._"
+      : "_AI assistance in authoring is allowed. Challenge answers must come from your own understanding. Passing posts a public attestation that you personally understand, tested, and can support this change. The quiz is generated from the diff; answers are graded automatically._",
   ].join("\n");
 }
 
@@ -265,23 +286,56 @@ export async function handlePullRequestEvent(
     }
   }
 
-  // synchronize with an existing pass and rechallenge policy says no new challenge → keep the pass.
-  if (action === "synchronize" && !shouldRechallengeOnPush(cfg, changedFiles)) {
-    if (await hasPassedChallenge(env.DB, repo, prNumber)) {
-      await api.createCheckRun(repo, {
-        name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
-        output: {
-          title: "Passed",
-          summary: withCodeHoneypotSummary("Author previously passed the challenge for this PR.", codeHoneypot),
-        },
-      });
-      return;
+  // Only the commits since the latest passed head decide whether that pass is
+  // invalidated. The full PR file list above still owns overall policy scope.
+  let deltaBaseSha: string | null = null;
+  let priorPassForDelta: Challenge | null = null;
+  if (action === "synchronize") {
+    const priorPass = await getLatestPassedChallenge(env.DB, repo, prNumber);
+    if (priorPass) {
+      let resetGate = false;
+      if (cfg.rechallenge.on_push !== "never") {
+        try {
+          const comparison = await api.compareCommits(repo, priorPass.head_sha, headSha);
+          resetGate = comparison.status === "ahead"
+            ? comparison.files.length > 0 && shouldRechallengeOnPush(
+              cfg,
+              comparison.files.map((file) => file.filename)
+            )
+            : comparison.status !== "identical";
+          if (resetGate && comparison.status === "ahead") {
+            deltaBaseSha = priorPass.head_sha;
+            priorPassForDelta = priorPass;
+          }
+        } catch {
+          // If a configured reset policy cannot be evaluated, fall back to a
+          // fresh full-PR challenge instead of silently preserving a stale pass.
+          resetGate = true;
+        }
+      }
+
+      if (!resetGate) {
+        await api.createCheckRun(repo, {
+          name: CHECK_NAME, head_sha: headSha, status: "completed", conclusion: "success",
+          output: {
+            title: "Pass carried forward",
+            summary: withCodeHoneypotSummary(
+              `Author passed the challenge at ${priorPass.head_sha.slice(0, 12)}; changes since then do not reset the gate under repository policy.`,
+              codeHoneypot
+            ),
+          },
+        });
+        return;
+      }
     }
   }
+
+  if (deltaBaseSha) cfg = applyRechallengeGate(cfg);
 
   const needsApproval =
     cfg.require_approval === "always" ||
     (cfg.require_approval === "first_time" &&
+      !deltaBaseSha &&
       ["FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "NONE"].includes(pr.author_association));
   const status = needsApproval ? "awaiting_approval" : "ready";
 
@@ -290,11 +344,17 @@ export async function handlePullRequestEvent(
     name: CHECK_NAME, head_sha: headSha, status: "queued",
     details_url: challengeUrl(env, challengeId),
     output: {
-      title: needsApproval ? "Awaiting maintainer approval" : "Awaiting challenge",
+      title: deltaBaseSha
+        ? (needsApproval ? "Awaiting approval for follow-up" : "Awaiting follow-up challenge")
+        : (needsApproval ? "Awaiting maintainer approval" : "Awaiting challenge"),
       summary:
-        (needsApproval
-          ? "A maintainer must approve the challenge (`/voucha approve`) before the author can take it."
-          : "The PR author must pass a comprehension quiz. Link in the PR comment.") +
+        (deltaBaseSha
+          ? (needsApproval
+            ? `A maintainer must approve a follow-up challenge covering changes since ${deltaBaseSha.slice(0, 12)}.`
+            : `The PR author must pass a follow-up quiz covering changes since ${deltaBaseSha.slice(0, 12)}.`)
+          : (needsApproval
+            ? "A maintainer must approve the challenge (`/voucha approve`) before the author can take it."
+            : "The PR author must pass a comprehension quiz. Link in the PR comment.")) +
         `\n\nChallenge link: ${challengeUrl(env, challengeId)}`,
     },
   });
@@ -306,10 +366,13 @@ export async function handlePullRequestEvent(
       repo_full_name: repo,
       pr_number: prNumber,
       head_sha: headSha,
+      delta_base_sha: deltaBaseSha,
       author_login: pr.author_login,
       check_run_id: checkRunId,
       status,
-      approved_by: null,
+      approved_by: deltaBaseSha && cfg.require_approval !== "always"
+        ? priorPassForDelta?.approved_by ?? null
+        : null,
       attempts_used: 0,
       cooldown_until: null,
       config_json: JSON.stringify(cfg),
@@ -326,7 +389,11 @@ export async function handlePullRequestEvent(
   }
 
   if (commentsEnabled(cfg)) {
-    await api.upsertPrComment(repo, prNumber, commentBody(env, challengeId, status, cfg, pr.author_login));
+    await api.upsertPrComment(
+      repo,
+      prNumber,
+      commentBody(env, challengeId, status, cfg, pr.author_login, deltaBaseSha)
+    );
   }
 }
 
@@ -360,10 +427,40 @@ export async function handleIssueCommentEvent(
     return;
   }
 
+  if (/^\/voucha\s+(?:retry|retrigger)\b/i.test(body)) {
+    if (!(await commentAuthorCanMaintain(api, repo, payload))) return;
+
+    const challenge = await getLatestChallengeForPr(env.DB, repo, prNumber);
+    if (!challenge || !["failed_assisted", "failed_final", "neutral"].includes(challenge.status)) return;
+    const pr = await api.getPr(repo, prNumber);
+    if (pr.head_sha !== challenge.head_sha) return;
+
+    const checkRunId = await api.createCheckRun(repo, {
+      name: CHECK_NAME,
+      head_sha: challenge.head_sha,
+      status: "queued",
+      details_url: challengeUrl(env, challenge.id),
+      output: {
+        title: "Retry requested",
+        summary: `@${commenter} restarted the challenge for this commit.`,
+      },
+    });
+    const restarted = await restartChallengeForRetry(env.DB, challenge.id, checkRunId, commenter);
+    if (!restarted) return;
+    const storedCfg = resolveConfig(restarted.config_json);
+    if (commentsEnabled(storedCfg)) {
+      await api.upsertPrComment(
+        repo,
+        prNumber,
+        `${commentBody(env, restarted.id, "ready", storedCfg, restarted.author_login)}\n\n_Retry requested by @${commenter}._`
+      );
+    }
+    return;
+  }
+
   if (!/^\/voucha\s+approve\b/.test(body)) return;
 
-  const permission = await api.getUserPermission(repo, commenter);
-  if (!hasWriteRepositoryAccess(permission)) return;
+  if (!(await commentAuthorCanMaintain(api, repo, payload))) return;
 
   const challenge = await getLatestChallengeForPr(env.DB, repo, prNumber);
   if (!challenge || challenge.status !== "awaiting_approval") return;

@@ -67,8 +67,9 @@ Before tightening policy, open or replay a few predictable PRs:
 - a normal challenged PR should produce a quiz link, pass, and then post a
   green attestation check;
 - a failed quiz should enter cooldown and then offer a fresh retry;
-- a new commit after a pass should keep the prior pass with the default
-  `rechallenge.on_push: never`.
+- a meaningful code commit after a pass should create a two-question follow-up
+  quiz scoped to that delta; a docs/Markdown-only commit should carry the pass
+  forward.
 
 If the check reports neutral, treat that as a VOUCHA-side availability or
 generation problem, not as a verdict on the PR.

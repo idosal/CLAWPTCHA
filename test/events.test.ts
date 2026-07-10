@@ -12,6 +12,20 @@ function stubApi(overrides: Partial<Record<keyof GitHubApi, any>> = {}): GitHubA
     createCheckRun: vi.fn(async () => 42),
     updateCheckRun: vi.fn(async () => {}),
     getPrDiff: vi.fn(async () => "diff --git a/src/app.ts b/src/app.ts\n+code"),
+    compareCommits: vi.fn(async () => ({
+      status: "ahead",
+      aheadBy: 1,
+      behindBy: 0,
+      totalCommits: 1,
+      files: [{
+        filename: "src/app.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        changes: 1,
+        patch: "+code",
+      }],
+    })),
     getPr: vi.fn(async (): Promise<PrDetails> => pr),
     listPrFiles: vi.fn(async () => ["src/app.ts"]),
     getIssue: vi.fn(async () => null),
@@ -434,8 +448,9 @@ describe("handlePullRequestEvent", () => {
     expect(api.createCheckRun).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a pass on synchronize by default", async () => {
-    const api = stubApi();
+  it("keeps a pass on synchronize when gate resets are disabled", async () => {
+    const yaml = `${codeHoneypotYaml}rechallenge:\n  on_push: never\n`;
+    const api = stubApi({ getFileContent: vi.fn(async () => yaml) });
     const n = uniq + 5;
     await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
     // simulate the sha1 challenge having been passed
@@ -445,16 +460,16 @@ describe("handlePullRequestEvent", () => {
     const p2 = payloadFor(n, "sha2");
     p2.action = "synchronize";
     const api2 = stubApi({
-      getFileContent: vi.fn(async () => codeHoneypotYaml),
+      getFileContent: vi.fn(async () => yaml),
       getPrDiff: vi.fn(async () => codeHoneypotDiff),
       getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })),
     });
     await handlePullRequestEvent(testEnv, api2, p2);
-    // rechallenge_on_push=false → new sha keeps success because prior pass exists
+    // on_push=never → new sha keeps success because prior pass exists
     expect(api2.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
       head_sha: "sha2", status: "completed", conclusion: "success",
       output: expect.objectContaining({
-        title: "Passed",
+        title: "Pass carried forward",
         summary: expect.stringContaining("configured code honeypot marker"),
       }),
     }));
@@ -496,6 +511,58 @@ describe("handlePullRequestEvent", () => {
     }));
   });
 
+  it("decides whether to reset a passed gate from the commit delta, not the whole PR", async () => {
+    const yaml = [
+      "include_paths: ['src/core/**']",
+      "rechallenge:",
+      "  on_push: included_paths",
+      "",
+    ].join("\n");
+    const n = uniq + 30;
+    const firstApi = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      listPrFiles: vi.fn(async () => ["src/core/service.ts"]),
+    });
+    await handlePullRequestEvent(testEnv, firstApi, payloadFor(n, "sha1"));
+    await testEnv.DB.prepare(
+      "UPDATE challenges SET status='passed' WHERE repo_full_name='o/r' AND pr_number=? AND head_sha='sha1'"
+    ).bind(n).run();
+
+    const nextPayload = payloadFor(n, "sha2");
+    nextPayload.action = "synchronize";
+    const nextApi = stubApi({
+      getFileContent: vi.fn(async () => yaml),
+      getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })),
+      // The full PR still contains core code, but this push changed only docs.
+      listPrFiles: vi.fn(async () => ["src/core/service.ts", "docs/guide.md"]),
+      compareCommits: vi.fn(async () => ({
+        status: "ahead",
+        aheadBy: 1,
+        behindBy: 0,
+        totalCommits: 1,
+        files: [{
+          filename: "docs/guide.md",
+          status: "modified",
+          additions: 2,
+          deletions: 0,
+          changes: 2,
+          patch: "+docs",
+        }],
+      })),
+    });
+
+    await handlePullRequestEvent(testEnv, nextApi, nextPayload);
+
+    expect(nextApi.compareCommits).toHaveBeenCalledWith("o/r", "sha1", "sha2");
+    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "sha2")).toBeNull();
+    expect(nextApi.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      head_sha: "sha2",
+      status: "completed",
+      conclusion: "success",
+      output: expect.objectContaining({ title: "Pass carried forward" }),
+    }));
+  });
+
   it("re-challenges a prior pass when structured rechallenge included_paths matches", async () => {
     const yaml = [
       "include_paths: ['src/core/**']",
@@ -510,7 +577,7 @@ describe("handlePullRequestEvent", () => {
     const n = uniq + 19;
     await handlePullRequestEvent(testEnv, api, payloadFor(n, "sha1"));
     await testEnv.DB.prepare(
-      "UPDATE challenges SET status='passed' WHERE repo_full_name='o/r' AND pr_number=? AND head_sha='sha1'"
+      "UPDATE challenges SET status='passed', approved_by='maintainer' WHERE repo_full_name='o/r' AND pr_number=? AND head_sha='sha1'"
     ).bind(n).run();
 
     const p2 = payloadFor(n, "sha2");
@@ -519,9 +586,43 @@ describe("handlePullRequestEvent", () => {
       getFileContent: vi.fn(async () => yaml),
       getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "sha2" })),
       listPrFiles: vi.fn(async () => ["src/core/service.ts"]),
+      compareCommits: vi.fn(async () => ({
+        status: "ahead",
+        aheadBy: 1,
+        behindBy: 0,
+        totalCommits: 1,
+        files: [{
+          filename: "src/core/service.ts",
+          status: "modified",
+          additions: 4,
+          deletions: 1,
+          changes: 5,
+          patch: "+new behavior",
+        }],
+      })),
     });
     await handlePullRequestEvent(testEnv, api2, p2);
-    expect(await getChallengeByPr(testEnv.DB, "o/r", n, "sha2")).not.toBeNull();
+    const followUp = await getChallengeByPr(testEnv.DB, "o/r", n, "sha2");
+    expect(followUp).not.toBeNull();
+    expect(followUp?.delta_base_sha).toBe("sha1");
+    expect(followUp?.status).toBe("ready");
+    expect(followUp?.approved_by).toBe("maintainer");
+    expect(JSON.parse(followUp!.config_json).gates).toEqual([{
+      type: "multiple_choice",
+      questions: 2,
+      pass_threshold: 2,
+    }]);
+    expect(api2.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      output: expect.objectContaining({
+        title: "Awaiting follow-up challenge",
+        summary: expect.stringContaining("changes since sha1"),
+      }),
+    }));
+    expect(api2.upsertPrComment).toHaveBeenCalledWith(
+      "o/r",
+      n,
+      expect.stringContaining("changes since sha1")
+    );
   });
 
   it("reads voucha.yml from the base ref, not the PR head or stale base SHA", async () => {
@@ -674,5 +775,120 @@ describe("handleIssueCommentEvent", () => {
     });
     const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
     expect(ch?.status).toBe("awaiting_approval");
+  });
+
+  it("restarts a terminal challenge when a maintainer comments '/voucha retry'", async () => {
+    const api = stubApi({
+      getPr: vi.fn(async () => ({ ...pr, author_association: "CONTRIBUTOR" })),
+    });
+    const n = uniq + 31;
+    const p = payloadFor(n);
+    p.pull_request.author_association = "CONTRIBUTOR";
+    await handlePullRequestEvent(testEnv, api, p);
+    const original = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    expect(original?.status).toBe("ready");
+    await testEnv.DB.prepare(
+      "UPDATE challenges SET status='failed_assisted', attempts_used=1, terminal_reconciled_at=? WHERE id=?"
+    ).bind(new Date().toISOString(), original!.id).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO quizzes (id, challenge_id, attempt_number, retry_cycle, questions_json, score, finished_at)
+       VALUES (?, ?, 1, 0, '{"questions":[]}', 0, ?)`
+    ).bind(`quizRetry${n}`, original!.id, new Date().toISOString()).run();
+
+    const retryApi = stubApi({
+      createCheckRun: vi.fn(async () => 99),
+      getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "abc123" })),
+      getUserPermission: vi.fn(async () => ({ permission: "write", role_name: "maintain" })),
+    });
+    await handleIssueCommentEvent(testEnv, retryApi, {
+      action: "created",
+      installation: { id: 1 },
+      repository: { full_name: "o/r" },
+      issue: { number: n, pull_request: {} },
+      comment: { body: "/voucha retry", user: { login: "maintainer" } },
+    });
+
+    const restarted = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    expect(restarted).toEqual(expect.objectContaining({
+      id: original!.id,
+      status: "ready",
+      attempts_used: 0,
+      retry_cycle: 1,
+      check_run_id: 99,
+      approved_by: "maintainer",
+      terminal_reconciled_at: null,
+    }));
+    expect(retryApi.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+      name: "PR comprehension check",
+      head_sha: "abc123",
+      status: "queued",
+      details_url: expect.stringContaining(`/challenge/${original!.id}`),
+    }));
+    expect(retryApi.upsertPrComment).toHaveBeenCalledWith(
+      "o/r",
+      n,
+      expect.stringContaining("Retry requested by @maintainer")
+    );
+    const previousQuiz = await testEnv.DB.prepare(
+      "SELECT retry_cycle, score FROM quizzes WHERE id=?"
+    ).bind(`quizRetry${n}`).first<{ retry_cycle: number; score: number }>();
+    expect(previousQuiz).toEqual({ retry_cycle: 0, score: 0 });
+  });
+
+  it("does not let a contributor restart a terminal challenge", async () => {
+    const api = stubApi({
+      getPr: vi.fn(async () => ({ ...pr, author_association: "CONTRIBUTOR" })),
+    });
+    const n = uniq + 32;
+    const p = payloadFor(n);
+    p.pull_request.author_association = "CONTRIBUTOR";
+    await handlePullRequestEvent(testEnv, api, p);
+    const original = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    await testEnv.DB.prepare("UPDATE challenges SET status='failed_final', attempts_used=3 WHERE id=?")
+      .bind(original!.id).run();
+
+    const contributorApi = stubApi({ getUserPermission: vi.fn(async () => "none") });
+    await handleIssueCommentEvent(testEnv, contributorApi, {
+      action: "created",
+      installation: { id: 1 },
+      repository: { full_name: "o/r" },
+      issue: { number: n, pull_request: {} },
+      comment: { body: "/voucha retrigger", user: { login: "contributor" } },
+    });
+
+    expect(contributorApi.createCheckRun).not.toHaveBeenCalled();
+    expect((await getChallengeByPr(testEnv.DB, "o/r", n, "abc123"))?.status).toBe("failed_final");
+  });
+
+  it("trusts GitHub's signed OWNER association for retry authorization", async () => {
+    const api = stubApi({
+      getPr: vi.fn(async () => ({ ...pr, author_association: "CONTRIBUTOR" })),
+    });
+    const n = uniq + 33;
+    const p = payloadFor(n);
+    p.pull_request.author_association = "CONTRIBUTOR";
+    await handlePullRequestEvent(testEnv, api, p);
+    const original = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+    await testEnv.DB.prepare("UPDATE challenges SET status='neutral' WHERE id=?").bind(original!.id).run();
+
+    const ownerApi = stubApi({
+      createCheckRun: vi.fn(async () => 100),
+      getPr: vi.fn(async () => ({ ...pr, number: n, head_sha: "abc123" })),
+      getUserPermission: vi.fn(async () => ({ permission: "none", role_name: "none" })),
+    });
+    await handleIssueCommentEvent(testEnv, ownerApi, {
+      action: "created",
+      installation: { id: 1 },
+      repository: { full_name: "o/r" },
+      issue: { number: n, pull_request: {} },
+      comment: {
+        body: "/voucha retry",
+        author_association: "OWNER",
+        user: { login: "owner" },
+      },
+    });
+
+    expect(ownerApi.getUserPermission).not.toHaveBeenCalled();
+    expect((await getChallengeByPr(testEnv.DB, "o/r", n, "abc123"))?.status).toBe("ready");
   });
 });

@@ -98,9 +98,9 @@ with `enforcement.auto_close`.
 | Passed | Green check with an attestation summary. |
 | Passed with multiple passive signals | Green check, explicit risk title, and optional `pr-comprehension:flagged` label. |
 | Failed attempt | Cooldown and retry policy apply; detailed signal feedback is withheld until final outcome. |
-| Challenge assistance detected | Failed check; optional PR auto-close when configured for `failed_assisted`. |
-| Attempts exhausted | Failed check; optional PR auto-close when configured for `failed_final`. |
-| Generation failure | Neutral check; the PR is not blocked by service failure. |
+| Challenge assistance detected | Failed check; optional PR auto-close when configured for `failed_assisted`; a maintainer can start a fresh cycle with `/voucha retry`. |
+| Attempts exhausted | Failed check; optional PR auto-close when configured for `failed_final`; a maintainer can start a fresh cycle with `/voucha retry`. |
+| Generation or service failure | Neutral check; the PR is not blocked, and a maintainer can retry after recovery. |
 | Superseded commit | Old challenge becomes inactive and the PR receives a current result. |
 | Expired setup | Scheduled sweep neutralizes stale awaiting or ready challenges. |
 

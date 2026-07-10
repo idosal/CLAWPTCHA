@@ -37,11 +37,13 @@ export interface Challenge {
   repo_full_name: string;
   pr_number: number;
   head_sha: string;
+  delta_base_sha: string | null;
   author_login: string;
   check_run_id: number | null;
   status: ChallengeStatus;
   approved_by: string | null;
   attempts_used: number;
+  retry_cycle: number;
   cooldown_until: string | null;
   config_json: string;
   auto_closed_at: string | null;

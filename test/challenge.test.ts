@@ -41,7 +41,7 @@ const twoQuestionQuiz = {
 function deps(overrides: Partial<ChallengeDeps> = {}): ChallengeDeps {
   return {
     generateQuiz: vi.fn(async () => ({ ok: true as const, quiz })),
-    verifyTurnstile: vi.fn(async () => true),
+    verifyTurnstile: vi.fn(async () => "passed" as const),
     fetchPrContext: vi.fn(async () => ({ diff: "d", title: "t", body: null, files: ["a.ts"] })),
     onChallengeResolved: vi.fn(async () => {}),
     now: () => new Date("2026-07-02T12:00:00Z"),
@@ -119,10 +119,27 @@ describe("startQuizAttempt", () => {
     expect(r).toEqual({ ok: false, error: "not_ready" });
   });
 
+  it("does not burn an attempt when the Turnstile token is missing", async () => {
+    const id = await makeChallenge();
+    const d = deps();
+
+    const r = await startQuizAttempt(testEnv, d, id, "alice", "   ");
+
+    expect(r).toEqual({ ok: false, error: "turnstile_missing" });
+    expect(d.verifyTurnstile).not.toHaveBeenCalled();
+    expect(d.generateQuiz).not.toHaveBeenCalled();
+    const challenge = await getChallenge(testEnv.DB, id);
+    expect(challenge?.status).toBe("ready");
+    expect(challenge?.attempts_used).toBe(0);
+    const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id=?")
+      .bind(id).first<{ count: number }>();
+    expect(row?.count).toBe(0);
+  });
+
   it("fails closed when Turnstile does not validate the browser session", async () => {
     const id = await makeChallenge();
     const d = deps({
-      verifyTurnstile: vi.fn(async () => false),
+      verifyTurnstile: vi.fn(async () => "failed" as const),
       fetchPrContext: vi.fn(async () => {
         throw new Error("should not fetch PR context");
       }),
@@ -223,6 +240,18 @@ describe("startQuizAttempt", () => {
     expect(JSON.parse(row!.telemetry_json)).toEqual({});
   });
 
+  it("records new quiz attempts in the current maintainer retry cycle", async () => {
+    const id = await makeChallenge();
+    await testEnv.DB.prepare("UPDATE challenges SET retry_cycle=2 WHERE id=?").bind(id).run();
+
+    const r = await startQuizAttempt(testEnv, deps(), id, "alice", "tok");
+
+    if (!r.ok) throw new Error("setup failed");
+    const row = await testEnv.DB.prepare("SELECT retry_cycle FROM quizzes WHERE id=?")
+      .bind(r.quizId).first<{ retry_cycle: number }>();
+    expect(row?.retry_cycle).toBe(2);
+  });
+
   it("neutralizes the check when LLM generation fails twice", async () => {
     const id = await makeChallenge();
     const d = deps({ generateQuiz: vi.fn(async () => ({ ok: false as const, error: "boom" })) });
@@ -232,6 +261,25 @@ describe("startQuizAttempt", () => {
       expect.objectContaining({ outcome: "neutral" })
     );
     expect((await getChallenge(testEnv.DB, id))?.status).toBe("neutral");
+  });
+
+  it("neutralizes the check when Turnstile is unavailable", async () => {
+    const id = await makeChallenge();
+    const d = deps({ verifyTurnstile: vi.fn(async () => "unavailable" as const) });
+
+    const r = await startQuizAttempt(testEnv, d, id, "alice", "tok");
+
+    expect(r).toEqual({ ok: false, error: "turnstile_unavailable" });
+    expect(d.generateQuiz).not.toHaveBeenCalled();
+    expect(d.onChallengeResolved).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "neutral" })
+    );
+    const challenge = await getChallenge(testEnv.DB, id);
+    expect(challenge?.status).toBe("neutral");
+    expect(challenge?.attempts_used).toBe(0);
+    const row = await testEnv.DB.prepare("SELECT COUNT(*) AS count FROM quizzes WHERE challenge_id=?")
+      .bind(id).first<{ count: number }>();
+    expect(row?.count).toBe(0);
   });
 });
 

@@ -95,15 +95,15 @@ function withAutoCloseCheckLine(summary: string, result: AutoCloseResult): strin
 
 function maintainerActionLine(result: AutoCloseResult): string {
   if (result === "closed") {
-    return "Repository policy auto-closed this PR. Maintainers can reopen it after manual review.";
+    return "Repository policy auto-closed this PR. Maintainers can reopen it after manual review, then comment `/voucha retry` to start a fresh challenge.";
   }
   if (result === "failed") {
-    return "Repository policy is configured to auto-close this PR, but VOUCHA could not close it. Maintainers: please review manually before merging.";
+    return "Repository policy is configured to auto-close this PR, but VOUCHA could not close it. Maintainers: review manually or comment `/voucha retry` to start a fresh challenge.";
   }
   if (result === "stale_head") {
     return "Repository policy did not auto-close this PR because the failed challenge belongs to an older commit. Review the current PR check before merging.";
   }
-  return "Maintainers: please review this PR manually before merging.";
+  return "Maintainers: review this PR manually or comment `/voucha retry` to start a fresh challenge for this commit.";
 }
 
 export async function apiForInstallation(env: Env, installationId: number): Promise<GitHubApi> {
@@ -270,6 +270,15 @@ export async function onChallengeResolved(
           summary: "Quiz generation failed (LLM/service issue). Not blocking the merge — this is a VOUCHA-side problem, not a verdict on the PR.",
         },
       });
+      if (commentsEnabled) {
+        await api.upsertPrComment(repo, pr, [
+          "## VOUCHA — unavailable",
+          "",
+          "VOUCHA could not complete this challenge because of a service-side problem. The check is neutral and does not block the PR.",
+          "",
+          "Maintainers: after the service recovers, comment `/voucha retry` to start a fresh challenge for this commit.",
+        ].join("\n"));
+      }
       break;
     }
   }
@@ -379,7 +388,7 @@ export async function sweepStaleChallenges(
       }
 
       const quiz = await env.DB.prepare(
-        "SELECT score FROM quizzes WHERE challenge_id=? AND score IS NOT NULL ORDER BY attempt_number DESC LIMIT 1"
+        "SELECT score FROM quizzes WHERE challenge_id=? AND score IS NOT NULL ORDER BY retry_cycle DESC, attempt_number DESC LIMIT 1"
       ).bind(ch.id).first<{ score: number }>();
       const scoreLine = quiz ? ` Final score: ${quiz.score}/4.` : "";
       const cfg = resolveConfig(ch.config_json);

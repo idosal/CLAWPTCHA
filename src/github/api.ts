@@ -51,6 +51,14 @@ export interface PrFileDetails {
   patch: string | null;
 }
 
+export interface CommitComparison {
+  status: string;
+  aheadBy: number;
+  behindBy: number;
+  totalCommits: number;
+  files: PrFileDetails[];
+}
+
 export class GitHubApi {
   constructor(
     private token: string,
@@ -123,6 +131,51 @@ export class GitHubApi {
   async getPrDiff(repo: string, prNumber: number): Promise<string> {
     const res = await this.req(`/repos/${this.repoPath(repo)}/pulls/${prNumber}`, {}, "application/vnd.github.diff");
     if (!res.ok) throw new Error(`getPrDiff ${res.status}`);
+    return res.text();
+  }
+
+  async compareCommits(repo: string, baseSha: string, headSha: string): Promise<CommitComparison> {
+    const range = `${encodeURIComponent(baseSha)}...${encodeURIComponent(headSha)}`;
+    const res = await this.req(`/repos/${this.repoPath(repo)}/compare/${range}`);
+    if (!res.ok) throw new Error(`compareCommits ${res.status}: ${await res.text()}`);
+    const comparison = (await res.json()) as {
+      status: string;
+      ahead_by: number;
+      behind_by: number;
+      total_commits: number;
+      files?: Array<{
+        filename: string;
+        status: string;
+        additions: number;
+        deletions: number;
+        changes: number;
+        patch?: string;
+      }>;
+    };
+    return {
+      status: comparison.status,
+      aheadBy: comparison.ahead_by,
+      behindBy: comparison.behind_by,
+      totalCommits: comparison.total_commits,
+      files: (comparison.files ?? []).map((file) => ({
+        filename: file.filename,
+        status: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+        changes: file.changes,
+        patch: file.patch ?? null,
+      })),
+    };
+  }
+
+  async getCommitComparisonDiff(repo: string, baseSha: string, headSha: string): Promise<string> {
+    const range = `${encodeURIComponent(baseSha)}...${encodeURIComponent(headSha)}`;
+    const res = await this.req(
+      `/repos/${this.repoPath(repo)}/compare/${range}`,
+      {},
+      "application/vnd.github.diff"
+    );
+    if (!res.ok) throw new Error(`getCommitComparisonDiff ${res.status}: ${await res.text()}`);
     return res.text();
   }
 

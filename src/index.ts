@@ -35,6 +35,7 @@ import { providerFromEnv, type QuizProvider } from "./quiz/providers";
 import { matchesGlob } from "./policy/exemptions";
 import { allowSessionCreation } from "./policy/ratelimit";
 import { sameGitHubLogin } from "./github/login";
+import { fetchPrContextForChallenge } from "./github/pr-context";
 import { chooseInvestigatorSource, investigatePrWithFlue, type InvestigationSource } from "./flue/investigator";
 import { turnstileProductionConfigError } from "./turnstile";
 import {
@@ -80,7 +81,7 @@ async function latestQuizResult(
     `SELECT score, questions_json, answers_json, telemetry_json
      FROM quizzes
      WHERE challenge_id=? AND score IS NOT NULL
-     ORDER BY attempt_number DESC
+     ORDER BY retry_cycle DESC, attempt_number DESC
      LIMIT 1`
   ).bind(challenge.id).first<{
     score: number;
@@ -156,8 +157,9 @@ function renderStartPage(
 }
 
 function failedChallengeMessage(latest: { failureReason?: string } | null): string {
-  if (latest?.failureReason) return `Bot verification failed: ${latest.failureReason}`;
-  return "No attempts remain. The PR check is failed; repository policy controls whether maintainers review manually or VOUCHA closes the PR.";
+  const retry = "A maintainer can comment `/voucha retry` on the PR to start a fresh challenge for this commit.";
+  if (latest?.failureReason) return `Bot verification failed: ${latest.failureReason} ${retry}`;
+  return `No attempts remain. The PR check is failed; repository policy controls whether maintainers review manually or VOUCHA closes the PR. ${retry}`;
 }
 
 function challengePathActions(path: string): PageAction[] {
@@ -352,23 +354,7 @@ export function challengeDeps(env: Env): ChallengeDeps {
     now: () => new Date(),
     async fetchPrContext(ch: Challenge) {
       const api = await apiForInstallation(env, ch.installation_id);
-      const [diff, pr, filePatches] = await Promise.all([
-        api.getPrDiff(ch.repo_full_name, ch.pr_number),
-        api.getPr(ch.repo_full_name, ch.pr_number),
-        api.listPrFileDetails(ch.repo_full_name, ch.pr_number),
-      ]);
-      return {
-        diff,
-        title: pr.title,
-        body: pr.body,
-        files: filePatches.map((file) => file.filename),
-        repoFullName: ch.repo_full_name,
-        prNumber: ch.pr_number,
-        headSha: ch.head_sha,
-        installationId: ch.installation_id,
-        changedLines: pr.additions + pr.deletions,
-        filePatches,
-      };
+      return fetchPrContextForChallenge(api, ch);
     },
     async generateQuiz(ctx, cfg) {
       ctx = filterContextForGeneration(ctx, cfg);
@@ -391,7 +377,8 @@ export function challengeDeps(env: Env): ChallengeDeps {
             ctx.body,
             ctx.files,
             quizGate.questions,
-            generationAttempts
+            generationAttempts,
+            ctx.deltaBaseSha
           );
         }
         if (investigation.mode === "large_pr" || investigation.source === "flue") {
@@ -404,30 +391,42 @@ export function challengeDeps(env: Env): ChallengeDeps {
           selected.provider,
           ctx.diff, ctx.title, ctx.body, ctx.files, cfg.max_context_tokens ?? cfg.context.detail_tokens,
           quizGate.questions,
-          fallbackAttempts
+          fallbackAttempts,
+          ctx.deltaBaseSha
         );
       }
       return generateQuiz(
         selected.provider,
         ctx.diff, ctx.title, ctx.body, ctx.files, cfg.max_context_tokens,
         quizGate.questions,
-        cfg.context.max_model_calls
+        cfg.context.max_model_calls,
+        ctx.deltaBaseSha
       );
     },
     async verifyTurnstile(token: string) {
       // Turnstile's browser token is trusted only after backend Siteverify.
-      // A non-success verdict is a bot-verification failure at quiz start.
+      // Configuration and service failures are VOUCHA outages, not bot verdicts.
       try {
-        if (!token) return false;
+        if (!token) return "failed" as const;
         const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: token }),
         });
-        if (!res.ok) return false;
-        return ((await res.json()) as { success: boolean }).success;
-      } catch {
-        return false;
+        if (!res.ok) return "unavailable" as const;
+        const result = (await res.json()) as { success?: boolean; "error-codes"?: string[] };
+        if (result.success) return "passed" as const;
+        const invalidTokenCodes = new Set([
+          "invalid-input-response",
+          "missing-input-response",
+          "timeout-or-duplicate",
+        ]);
+        return result["error-codes"]?.some((code) => invalidTokenCodes.has(code))
+          ? "failed" as const
+          : "unavailable" as const;
+      } catch (err) {
+        console.error("Turnstile Siteverify request failed", err);
+        return "unavailable" as const;
       }
     },
     async onChallengeResolved(r) {
@@ -452,7 +451,7 @@ app.get("/challenge/:id", async (c) => {
   }
   if (challenge.status === "neutral") {
     return c.html(errorPage("VOUCHA unavailable",
-      "The challenge could not be completed because of a VOUCHA-side problem. The PR should not be blocked by this challenge.",
+      "The challenge could not be completed because of a VOUCHA-side problem. The PR should not be blocked. A maintainer can comment `/voucha retry` on the PR after the service recovers.",
       challengePageActions(challenge)));
   }
   if (challenge.status === "superseded") {
@@ -469,7 +468,7 @@ app.get("/challenge/:id", async (c) => {
       challengePageActions(challenge)
     ));
   }
-  if (challenge.status === "failed_final") {
+  if (challenge.status === "failed_assisted" || challenge.status === "failed_final") {
     return c.html(resultPage(
       false,
       latest?.score ?? 0,
@@ -574,6 +573,14 @@ app.post("/challenge/:id/start", async (c) => {
     hasSubmittedHoneypot(form)
   );
   if (!result.ok) {
+    if (result.error === "turnstile_missing") {
+      const challenge = await getChallenge(c.env.DB, c.req.param("id"));
+      if (!challenge) return c.html(errorPage("Cannot start", "Challenge not found."), 404);
+      return renderStartPage(
+        c, challenge, resolveConfig(challenge.config_json),
+        "Complete browser verification before starting the challenge.", 400
+      );
+    }
     if (result.error === "bot_detected") return c.redirect(`/challenge/${c.req.param("id")}`);
     const messages: Record<string, string> = {
       not_ready: "This challenge isn't ready (awaiting approval or already resolved).",
@@ -581,6 +588,7 @@ app.post("/challenge/:id/start", async (c) => {
       attempts_exhausted: "No attempts remain. The PR check is failed; repository policy controls manual review or auto-close.",
       rate_limited: "Rate limit reached. Try again later.",
       generation_failed: "We couldn't generate the quiz from this PR right now. This is a VOUCHA-side generation problem, so the check has been marked neutral and you're not blocked.",
+      turnstile_unavailable: "Browser verification is misconfigured or unavailable. This is a VOUCHA-side problem, so the check has been marked neutral and you're not blocked.",
       not_author: "Only the PR author can take this challenge.",
       not_found: "Challenge not found.",
     };

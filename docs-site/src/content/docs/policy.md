@@ -150,12 +150,16 @@ Pushes to an already-passed PR are controlled separately:
 rechallenge:
   on_push: included_paths
   ignore_paths: ["docs/**", "*.md"]
+  questions: 2
 ```
 
-Use `included_paths` when a prior pass should survive docs/example updates but
-be invalidated by changes in core paths. If the effective `include_paths` list
-is empty, `included_paths` falls back to strict behavior and rechallenges
-pushes that are not ignored by `rechallenge.ignore_paths`.
+The decision uses only the comparison between the latest passed head and the
+incoming head. Use `included_paths` when a prior pass should survive
+docs/example deltas but be invalidated by changes in core paths. If the
+effective `include_paths` list is empty, `included_paths` falls back to strict
+behavior and resets for any delta not ignored by `rechallenge.ignore_paths`.
+The resulting follow-up quiz uses only that delta and up to the configured
+`questions` count; it never expands the main gate.
 
 ## Approval, attempts, and cooldown
 
@@ -173,6 +177,16 @@ Maintainers approve with a PR comment:
 `max_attempts` and `cooldown_minutes` control retry behavior. A failed non-final
 attempt enters cooldown and generates a fresh quiz on retry. Once attempts are
 exhausted, the PR stays failed for maintainer review by default.
+
+A write-capable maintainer can restart a terminal failed or neutral challenge
+for the same commit without discarding the previous audit:
+
+```text
+/voucha retry
+```
+
+`/voucha retrigger` is accepted as an alias. A retry starts a new attempt cycle,
+creates a new queued check run, and keeps the existing challenge link.
 
 `enforcement.auto_close` can additionally close PRs after terminal hard-failure
 outcomes. It is off by default and never closes retryable failures, neutral

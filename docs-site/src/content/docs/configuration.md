@@ -80,8 +80,9 @@ bot_policy:
   trusted_logins: ["dependabot[bot]", "renovate[bot]"]
 
 rechallenge:
-  on_push: never
+  on_push: included_paths
   ignore_paths: ["docs/**", "*.md"]
+  questions: 2
 
 min_changed_lines: 10
 skip_paths: ["docs/**", "*.md"]
@@ -338,13 +339,26 @@ and can contain up to 50 glob patterns.
 rechallenge:
   on_push: included_paths
   ignore_paths: ["docs/**", "*.md"]
+  questions: 2
 ```
 
-`on_push` accepts `never`, `always`, or `included_paths`. `included_paths` uses
-the effective `include_paths`; if that list is empty, it behaves like `always`
-so stale passes are not silently preserved. `ignore_paths` keeps low-risk pushes
-from invalidating a prior pass. Legacy `rechallenge_on_push: true` maps to
-`on_push: always` when `rechallenge` is omitted.
+VOUCHA compares the latest passed head with the incoming head and evaluates only
+that commit delta. `on_push` accepts `never`, `always`, or `included_paths`:
+
+- `never` carries the prior pass to every later head.
+- `always` resets the gate for any non-ignored delta.
+- `included_paths` resets only when the delta touches the effective
+  `include_paths`; if that list is empty, any non-ignored delta resets it.
+
+`ignore_paths` lets low-risk deltas carry the pass forward and excludes those
+files from mixed follow-up quiz evidence. A reset stores the passed head as its
+baseline and generates an up-to-`questions`-long follow-up quiz from only the
+commits after that head. First-time approval carries forward within the
+PR; `require_approval: always` still requires approval for the follow-up. If a
+comparison cannot safely produce a normal ahead-only delta, VOUCHA falls back to
+a full-PR challenge instead of silently preserving the pass. Legacy
+`rechallenge_on_push: true` maps to `on_push: always` when `rechallenge` is
+omitted.
 
 `output` controls PR noise and labels:
 
@@ -428,7 +442,7 @@ older truncation path.
 | `draft_prs` | `ignore` |
 | `accountability` | `{ require_pr_acknowledgement: false, require_ai_disclosure: false }` |
 | `bot_policy` | `{ default: "skip", trusted_logins: [] }` |
-| `rechallenge` | `{ on_push: "never", ignore_paths: [] }` |
+| `rechallenge` | `{ on_push: "included_paths", ignore_paths: ["docs/**", "*.md"], questions: 2 }` |
 | `min_changed_lines` | `10` |
 | `skip_paths` | `["docs/**", "*.md"]` |
 | `include_paths` | `[]` |

@@ -180,6 +180,10 @@ export function buildInvestigationPrompt(ctx: PrContext, cfg: VouchaConfig): str
     `Changed files: ${changedFiles}`,
     `Changed lines: ${changedLines || "(unknown)"}`,
     `Investigation mode: ${mode}`,
+    ...(ctx.deltaBaseSha ? [
+      `Follow-up scope: commits after passed head ${ctx.deltaBaseSha}`,
+      "Investigate only this follow-up delta. Do not treat earlier PR changes as new evidence.",
+    ] : []),
     "",
     "Full changed-file map:",
     fileList || "(none)",

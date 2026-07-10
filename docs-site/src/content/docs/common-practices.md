@@ -133,16 +133,19 @@ as review-ready work.
 
 ## Rechallenge only when new commits matter
 
-The default `rechallenge.on_push: never` is calm for contributors: a passed PR
-keeps its pass across follow-up commits. Use `always` for strict repositories.
-Use `included_paths` when only changes to configured `include_paths` should
-invalidate a prior pass.
+The default is delta-aware: VOUCHA compares the latest passed head with the new
+head, ignores docs/Markdown-only follow-ups, and resets the gate for meaningful
+changes. The follow-up is two questions and is generated only from the new
+commits, not the entire PR. Use `never` when a repository deliberately wants a
+pass to survive every later push; use `always` when every non-ignored delta must
+reset it.
 
 ```yaml
 include_paths: ["src/core/**", "migrations/**"]
 rechallenge:
   on_push: included_paths
   ignore_paths: ["docs/**", "*.md"]
+  questions: 2
 ```
 
 If `include_paths` is empty, `included_paths` behaves like `always`. That is a

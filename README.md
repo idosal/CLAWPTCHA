@@ -112,8 +112,9 @@ bot_policy:
   default: skip            # skip | challenge
   trusted_logins: ["dependabot[bot]", "renovate[bot]"]
 rechallenge:
-  on_push: never           # never | always | included_paths
+  on_push: included_paths  # never | always | included_paths
   ignore_paths: ["docs/**", "*.md"]
+  questions: 2             # max follow-up quiz length, 1-10
 min_changed_lines: 10
 skip_paths: ["docs/**", "*.md"]
 include_paths: []        # optional opt-in scope, e.g. ["src/core/**"]
@@ -150,7 +151,7 @@ enforcement:
 | `trust` | `{ default_author_associations: ["OWNER", "MEMBER", "COLLABORATOR"] }` | Built-in GitHub `author_association` classes that skip the challenge before other author, size, and path rules. Set `default_author_associations: []` when owners, members, and collaborators should take the challenge too. |
 | `accountability` | `{ require_pr_acknowledgement: false, require_ai_disclosure: false }` | Optional PR-body preflight. When enabled, VOUCHA fails the check before creating a quiz unless the PR body has the configured acknowledgement and/or AI assistance disclosure line. |
 | `bot_policy` | `{ default: "skip", trusted_logins: [] }` | Structured bot handling. `default: challenge` lets repos challenge bots except named trusted bot logins. Legacy `skip_bots` maps into this when `bot_policy` is omitted. |
-| `rechallenge` | `{ on_push: "never", ignore_paths: [] }` | Structured push policy. `on_push` can be `never`, `always`, or `included_paths`; `ignore_paths` keeps low-risk pushes from invalidating a prior pass. `included_paths` uses the effective `include_paths`; when that list is empty it behaves like `always` so stale passes are not silently preserved. |
+| `rechallenge` | `{ on_push: "included_paths", ignore_paths: ["docs/**", "*.md"], questions: 2 }` | Delta-aware push policy. VOUCHA compares the latest passed head with the new head. `never` carries the pass forward, `always` resets on any non-ignored delta, and `included_paths` resets only when the delta reaches the effective `include_paths` (or any non-ignored file when `include_paths` is empty). A reset creates an up-to-`questions`-long follow-up quiz using only that delta and excludes ignored files from its evidence. |
 | `min_changed_lines` | `10` | Diffs with fewer than this many changed lines (additions + deletions) are exempt ("diff below min_changed_lines"). |
 | `skip_paths` | `["docs/**", "*.md"]` | Glob list. If **every** changed file in the PR matches at least one pattern, the PR is exempt. PRs with zero reported changed files are never exempted this way. |
 | `include_paths` | `[]` | Optional glob list for opt-in scope. When non-empty, a PR is exempt unless at least one changed file matches one of these patterns. PRs with zero reported changed files are never exempted this way. |
@@ -601,11 +602,16 @@ cannot run in CI. Walk each scenario and record the outcome:
       auto-advanced challenge tab, pass Turnstile, answer the quiz → green
       check, attestation comment posted, risk report visible in the check run
       details.
-- [ ] Push a new commit → the new head SHA keeps the existing pass (default
-      `rechallenge.on_push: never`).
+- [ ] Push a meaningful code commit after a pass → the new head gets a
+      two-question follow-up challenge generated only from that commit delta.
+- [ ] Push only docs/Markdown after a pass → the new head carries the pass
+      forward with an explicit check summary.
 - [ ] Open a docs-only PR → gets a success check with an "Exempt" summary.
 - [ ] Fail a quiz deliberately → red check, cooldown message shown; retrying
       after the cooldown gets a freshly generated quiz.
+- [ ] Exhaust attempts, then comment `/voucha retry` from a write-capable
+      maintainer → a new queued check appears on the same commit, the existing
+      challenge link becomes active, and the previous audit remains stored.
 - [ ] Temporarily break the LLM config (e.g. set `LLM_MODEL` to a nonexistent
       model, or an invalid `LLM_API_KEY`) and start a quiz → check goes
       `neutral`, merge is not blocked.

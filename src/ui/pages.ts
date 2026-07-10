@@ -1186,22 +1186,29 @@ h1{
   word-break:break-word;
 }
 .command-row{
-  display:flex;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
   align-items:center;
   gap:10px;
   margin-top:4px;
+  max-width:100%;
 }
 .command-row code{
-  flex:1 1 auto;
   min-width:0;
   margin-top:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
 }
 .command-copy-button{
-  flex:0 0 auto;
+  width:auto;
   min-width:0;
   min-height:34px;
   padding:0 10px;
   font-size:.84rem;
+  white-space:nowrap;
 }
 .consent-check:has(input:focus-visible){
   outline:3px solid var(--focus);
@@ -1727,8 +1734,8 @@ body:not(.site-body) .verify-actions{
   grid-template-columns:minmax(150px,1.2fr) repeat(3,minmax(112px,.9fr));
   align-items:start;
 }
-body:not(.site-body) .verify-actions .btn,
-body:not(.site-body) .verify-actions .btn-secondary{
+body:not(.site-body) .verify-actions > .btn,
+body:not(.site-body) .verify-actions > .btn-secondary{
   width:100%;
   min-width:0;
 }
@@ -1772,6 +1779,7 @@ body:not(.site-body) .command-card code{
 }
 body:not(.site-body) .command-copy-button{
   width:auto;
+  min-width:76px;
   min-height:32px;
   padding:0 10px;
   font-size:.84rem;
@@ -2389,6 +2397,7 @@ body:not(.site-body) .state-card p{
     grid-template-columns:1fr;
   }
   .btn,.btn-secondary{width:100%; min-width:0}
+  .command-copy-button.btn-secondary{width:auto; min-width:76px}
   .result-actions,.status-actions{display:grid; grid-template-columns:1fr}
   .result-main,.status-main{padding:38px 24px}
 }
@@ -4634,6 +4643,81 @@ body:not(.site-body) .state-card p{
   height:100%;
   display:block;
 }
+.voucha-faq{
+  width:min(1120px,calc(100% - 40px));
+  margin:0 auto;
+  padding:38px 0;
+  border-top:2px solid #101816;
+}
+.voucha-faq h2{
+  margin:0 0 22px;
+  color:#101816;
+  font-size:2.35rem;
+  line-height:1.02;
+  font-weight:900;
+  text-wrap:balance;
+}
+.faq-list{
+  display:grid;
+  gap:12px;
+}
+.faq-item{
+  border:2px solid #101816;
+  border-radius:10px;
+  background:#fffdfa;
+  overflow:hidden;
+}
+.faq-item summary{
+  position:relative;
+  padding:16px 44px 16px 16px;
+  color:#101816;
+  font-size:1.08rem;
+  font-weight:800;
+  cursor:pointer;
+  list-style:none;
+}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary::after{
+  content:"+";
+  position:absolute;
+  top:16px;
+  right:16px;
+  color:#ff6f4d;
+  font-size:1.35rem;
+  font-weight:800;
+  line-height:1.1;
+}
+.faq-item[open] summary::after{content:"\\2013"}
+.faq-item p{
+  margin:0;
+  padding:0 16px 16px;
+  max-width:70ch;
+  color:#2f403b;
+  font-size:1rem;
+  line-height:1.5;
+}
+@media (max-width:560px){
+  .voucha-faq{
+    width:auto;
+    max-width:none;
+    margin-left:16px;
+    margin-right:0;
+  }
+  .voucha-faq h2{font-size:2rem}
+  .faq-item summary,
+  .faq-item p{overflow-wrap:anywhere}
+}
+@media (prefers-color-scheme:dark){
+  .voucha-faq{border-color:#d8f35f}
+  .voucha-faq h2{color:#f7fff9}
+  .faq-item{
+    border-color:#d8f35f;
+    background:#151f1b;
+  }
+  .faq-item summary{color:#f7fff9}
+  .faq-item summary::after{color:#ff7a59}
+  .faq-item p{color:#bfd0c6}
+}
 `;
 
 interface SocialMeta {
@@ -4739,50 +4823,54 @@ function stageRail(stage: "verify" | "answer" | "attest"): string {
   return `<ol class="rail" style="--steps:3;--rail-scale:${activeIndex / 2}">${items}</ol>`;
 }
 
-function contextPanel(prRef: string, variant: "verify" | "start" | "question"): string {
-  const secondSection = variant === "verify"
-    ? `<section class="context-section">
-    <p class="side-kicker">Author check</p>
-    <h3>No delegated access</h3>
-    <ul class="plain-list">
-      <li>GitHub verifies the comment author.</li>
-      <li>VOUCHA never receives a user token.</li>
-      <li>The app cannot comment, approve, or answer for you.</li>
-    </ul>
-  </section>`
-    : `<section class="context-section">
-    <p class="side-kicker">PR record</p>
-    <h3>What maintainers see</h3>
-    <ul class="plain-list">
-      <li>The outcome posts back to the PR.</li>
-      <li>Answers and summary signals stay for maintainers.</li>
-      <li>No keystrokes, webcam, or screen recording.</li>
-    </ul>
-    <a class="inline-link" href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Read details</a>
-  </section>`;
-  return `<aside class="context-panel" aria-label="Challenge context">
-  <div class="context-tabs" aria-hidden="true">
-    <span class="context-tab active">PR summary</span>
-    <span class="context-tab">Policy</span>
-  </div>
+function contextPanel(_prRef: string, variant: "verify" | "start" | "question"): string {
+  const specs: Record<"verify" | "start" | "question", {
+    heading: string;
+    items: Array<[icon: string, label: string, detail: string]>;
+    note: string;
+  }> = {
+    verify: {
+      heading: "What to expect",
+      items: [
+        ["1", "Post the command", "As the author, in the PR thread."],
+        ["2", "GitHub confirms it's you", "Authorship is checked from the comment."],
+        ["3", "Then answer", "This tab continues on its own."],
+      ],
+      note: "VOUCHA records timing summaries for maintainers. No keystrokes, webcam, or screen recording.",
+    },
+    start: {
+      heading: "What to expect",
+      items: [
+        ["PR", "From this PR", "Questions come from your actual diff."],
+        ["60s", "Per question", "A 60-second timer, then it advances."],
+        ["✓", "On finish", "Your result posts to the PR as a check."],
+      ],
+      note: "Your answers and timing summaries stay with maintainers. No keystrokes, webcam, or screen recording.",
+    },
+    question: {
+      heading: "During the quiz",
+      items: [
+        ["60s", "Per question", "The timer runs; if it ends, the question is skipped."],
+        ["→", "One at a time", "Answering moves you to the next question."],
+        ["✓", "On finish", "Your result posts to the PR."],
+      ],
+      note: "Timing and pointer summaries stay with maintainers. Bot checks can stop the challenge.",
+    },
+  };
+  const spec = specs[variant];
+  const items = spec.items
+    .map(([icon, label, detail]) =>
+      `<div class="info-item"><span class="info-icon">${esc(icon)}</span><span><b>${esc(label)}</b>${esc(detail)}</span></div>`)
+    .join("\n      ");
+  return `<aside class="context-panel" aria-label="What to expect">
   <section class="context-section">
-    <p class="side-kicker">Pull request</p>
-    <h2>${esc(prRef)}</h2>
+    <h2>${esc(spec.heading)}</h2>
     <div class="info-list">
-      <div class="info-item"><span class="info-icon">4</span><span><b>Questions</b>One at a time.</span></div>
-      <div class="info-item"><span class="info-icon">60</span><span><b>Timer</b>Answered or skipped.</span></div>
-      <div class="info-item"><span class="info-icon">PR</span><span><b>Record</b>Outcome posts back to the pull request.</span></div>
+      ${items}
     </div>
   </section>
-  ${secondSection}
   <section class="context-section">
-    <p class="side-kicker">Policy</p>
-    <h3>${variant === "start" ? "Before questions load" : variant === "verify" ? "Before the quiz" : "During the quiz"}</h3>
-    <p class="data-line">${variant === "start"
-      ? "Browser verification must pass before questions are generated. Passive signals stay maintainer evidence."
-      : variant === "verify"
-        ? "After GitHub sees the one-time command, this tab advances automatically."
-        : "Bot verification failures stop the challenge. Timing and pointer summaries stay maintainer evidence."}</p>
+    <p class="data-line">${esc(spec.note)} <a class="inline-link" href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Read details</a></p>
   </section>
 </aside>`;
 }
@@ -5074,6 +5162,32 @@ export function homePage(servedOrigin = "https://voucha.dev"): string {
       <p class="install-note">Privacy, permissions, configuration, and verification details live in the docs.</p>
     </aside>
   </section>
+
+  <section class="voucha-faq" aria-labelledby="faq-title">
+    <h2 id="faq-title">Questions maintainers ask.</h2>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>How does it actually work?</summary>
+        <p>A PR opens, the policy decides if a challenge is needed, and the author verifies they own the PR and answers a short quiz built from the diff. Pass posts a check and attestation; fail means a cooldown and a fresh quiz. <a class="inline-link" href="/docs/challenge-lifecycle/">See the challenge lifecycle</a>.</p>
+      </details>
+      <details class="faq-item">
+        <summary>How does this fit with code review, CI, and branch protection?</summary>
+        <p>Those check the <em>code</em> or route the PR; VOUCHA checks the <em>author</em>. CI asks whether it works, review whether it's good, VOUCHA whether the person submitting understands it. It runs before review, not instead of it.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Is this a quiz, or a governance layer?</summary>
+        <p>A governance layer — one place to decide how much scrutiny a PR needs. Trust, exemptions, routing, and passive signals settle the coarse cases; the interactive challenge is the fine-grained last mile for the changes those can't.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does it block merges?</summary>
+        <p>Not by default — it posts a check and reports <code>neutral</code> on any failure, timeout, or outage, leaving enforcement to your branch-protection rules. Maintainers can optionally enable auto-close to close a PR that fails the challenge.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Isn't this gatekeeping contributors?</summary>
+        <p>On the contrary. VOUCHA gives maintainers the confidence to say yes to contributions. AI-written code may be welcome by maintainers, but it allows them to ask that whoever submits can stand behind it.</p>
+      </details>
+    </div>
+  </section>
 </div>`, {
     bodyClass: "site-body",
     mainClass: "site-page",
@@ -5112,8 +5226,8 @@ export function startPage(
             </label>
             <p class="data-line">Bot verification failures stop the challenge. Privacy and permission details live in the docs. <a href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Read details</a>.</p>
           </div>
-          <div class="turnstile-box" aria-label="Browser verification"><div class="cf-turnstile" data-sitekey="${esc(turnstileSiteKey)}"></div><span class="turnstile-fallback">Browser verification</span></div>
-          <button class="btn" type="submit" id="startButton">Begin challenge</button>
+          <div class="turnstile-box" aria-label="Browser verification"><div class="cf-turnstile" data-sitekey="${esc(turnstileSiteKey)}" data-callback="vouchaTurnstileReady" data-expired-callback="vouchaTurnstileExpired" data-error-callback="vouchaTurnstileExpired" data-timeout-callback="vouchaTurnstileExpired"></div><span class="turnstile-fallback">Browser verification</span></div>
+          <button class="btn" type="submit" id="startButton" disabled>Verifying browser...</button>
           <div class="start-progress" id="startProgress" role="status" aria-live="polite" hidden>
             <div><strong id="startProgressTitle">Preparing the quiz</strong><p id="startProgressMessage">This can take a moment while VOUCHA reads the PR and asks the model for questions.</p></div>
             <ol aria-label="Start progress">
@@ -5128,6 +5242,25 @@ export function startPage(
     ${contextPanel(prRef, "start")}
   </div>
 </div>
+<script>
+(function () {
+  window.vouchaTurnstileVerified = false;
+  window.vouchaTurnstileReady = function () {
+    window.vouchaTurnstileVerified = true;
+    var button = document.getElementById("startButton");
+    if (!button || button.getAttribute("data-starting") === "true") return;
+    button.disabled = false;
+    button.textContent = "Begin challenge";
+  };
+  window.vouchaTurnstileExpired = function () {
+    window.vouchaTurnstileVerified = false;
+    var button = document.getElementById("startButton");
+    if (!button || button.getAttribute("data-starting") === "true") return;
+    button.disabled = true;
+    button.textContent = "Verifying browser...";
+  };
+})();
+</script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
 (function () {
@@ -5152,7 +5285,14 @@ export function startPage(
     if (message) message.textContent = nextMessage;
     markStep(step);
   }
-  form.addEventListener("submit", function () {
+  form.addEventListener("submit", function (event) {
+    if (!window.vouchaTurnstileVerified) {
+      event.preventDefault();
+      button.disabled = true;
+      button.textContent = "Verifying browser...";
+      return;
+    }
+    button.setAttribute("data-starting", "true");
     button.disabled = true;
     button.textContent = "Starting challenge...";
     if (progress) progress.hidden = false;
@@ -5350,14 +5490,6 @@ export function errorPage(title: string, message: string, actions: PageAction[] 
       <div class="status-strip ${tone}">
         <span class="status-dot">${statusSymbol(tone)}</span>
         <span class="status-copy"><b>${esc(cleanTitle)}</b><span>Check the PR for the current gate state.</span></span>
-      </div>
-      <section class="state-card">
-        <h2>What VOUCHA means</h2>
-        <p>VOUCHA records PR comprehension. Bot verification failures are blocking; VOUCHA-side service failures should not block a merge.</p>
-      </section>
-      <div class="status-strip info">
-        <span class="status-dot">i</span>
-        <span class="status-copy"><b>PR-native review</b><span>Use the pull request for the current gate state.</span></span>
       </div>
     </aside>
   </div>

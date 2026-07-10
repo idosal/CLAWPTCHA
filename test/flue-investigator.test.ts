@@ -92,7 +92,7 @@ describe("investigatePrWithFlue", () => {
 
     const result = await investigatePrWithFlue({
       FLUE_INVESTIGATOR: { fetch: serviceFetch } as unknown as Fetcher,
-    }, largeCtx, DEFAULT_CONFIG);
+    }, { ...largeCtx, deltaBaseSha: "passed-sha" }, DEFAULT_CONFIG);
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.artifact.mode).toBe("large_pr");
@@ -106,11 +106,12 @@ describe("investigatePrWithFlue", () => {
     expect(init.headers).not.toHaveProperty("authorization");
     const body = JSON.parse(String(init.body)) as {
       repo: { full_name: string; pr_number: number; head_sha: string };
-      pr: { mode: string };
+      pr: { mode: string; delta_base_sha?: string };
       github?: unknown;
     };
     expect(body.repo).toEqual({ full_name: "o/r", pr_number: 42, head_sha: "abc123" });
     expect(body.pr.mode).toBe("large_pr");
+    expect(body.pr.delta_base_sha).toBe("passed-sha");
     expect(body.github).toBeUndefined();
     expect(String(init.body)).not.toContain("ghs_");
   });

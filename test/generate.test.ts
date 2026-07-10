@@ -123,6 +123,21 @@ describe("buildGenerationPrompt", () => {
     const p = buildGenerationPrompt("diff", "title", null, ["a.ts"], null, 1);
     expect(p).toContain("Generate exactly 1 question.");
   });
+
+  it("limits a follow-up quiz to the delta after the passed head", () => {
+    const p = buildGenerationPrompt(
+      "DELTA_DIFF",
+      "Full PR title",
+      "Full PR body",
+      ["follow-up.ts"],
+      null,
+      2,
+      "passed-sha"
+    );
+
+    expect(p).toContain("Follow-up scope: commits after passed head passed-sha");
+    expect(p).toContain("Ask only about this follow-up delta");
+  });
 });
 
 describe("investigation-backed generation", () => {
@@ -144,6 +159,20 @@ describe("investigation-backed generation", () => {
     expect(prompt).toContain("Investigation artifact");
     expect(prompt).toContain("Prevent oversized archive downloads");
     expect(prompt).not.toContain("```diff");
+  });
+
+  it("keeps investigation-backed follow-up questions inside the delta scope", () => {
+    const prompt = buildInvestigatedGenerationPrompt(
+      investigation,
+      "title",
+      null,
+      ["src/infra/clawhub.ts"],
+      2,
+      "passed-sha"
+    );
+
+    expect(prompt).toContain("Follow-up scope: commits after passed head passed-sha");
+    expect(prompt).toContain("Ask only about this follow-up delta");
   });
 
   it("generates and validates a quiz from an investigation artifact", async () => {

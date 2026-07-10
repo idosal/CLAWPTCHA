@@ -31,34 +31,56 @@ export async function getLatestChallengeForPr(
     .first<Challenge>();
 }
 
-export async function hasPassedChallenge(
+export async function getLatestPassedChallenge(
   db: D1Database, repo: string, prNumber: number
-): Promise<boolean> {
-  const row = await db
+): Promise<Challenge | null> {
+  return db
     .prepare(
-      "SELECT 1 AS x FROM challenges WHERE repo_full_name=? AND pr_number=? AND status='passed' LIMIT 1"
+      `SELECT * FROM challenges
+       WHERE repo_full_name=? AND pr_number=? AND status='passed'
+       ORDER BY created_at DESC, rowid DESC LIMIT 1`
     )
     .bind(repo, prNumber)
-    .first();
-  return row !== null;
+    .first<Challenge>();
 }
 
 export async function insertChallenge(
   db: D1Database,
-  c: Omit<Challenge, "auto_closed_at" | "created_at" | "terminal_reconciled_at">
+  c: Omit<
+    Challenge,
+    "auto_closed_at" | "created_at" | "delta_base_sha" | "retry_cycle" | "terminal_reconciled_at"
+  > & { delta_base_sha?: string | null }
 ): Promise<void> {
   await db
     .prepare(
       `INSERT INTO challenges
-       (id, installation_id, repo_full_name, pr_number, head_sha, author_login,
+       (id, installation_id, repo_full_name, pr_number, head_sha, delta_base_sha, author_login,
         check_run_id, status, approved_by, attempts_used, cooldown_until, config_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
-      c.id, c.installation_id, c.repo_full_name, c.pr_number, c.head_sha, c.author_login,
+      c.id, c.installation_id, c.repo_full_name, c.pr_number, c.head_sha, c.delta_base_sha ?? null, c.author_login,
       c.check_run_id, c.status, c.approved_by, c.attempts_used, c.cooldown_until, c.config_json
     )
     .run();
+}
+
+export async function restartChallengeForRetry(
+  db: D1Database,
+  id: string,
+  checkRunId: number,
+  approvedBy: string
+): Promise<Challenge | null> {
+  const updated = await db.prepare(
+    `UPDATE challenges
+     SET status='ready', attempts_used=0, retry_cycle=retry_cycle+1,
+         cooldown_until=NULL, approved_by=?, check_run_id=?,
+         auto_closed_at=NULL, terminal_reconciled_at=NULL
+     WHERE id=? AND status IN ('failed_assisted','failed_final','neutral')`
+  ).bind(approvedBy, checkRunId, id).run();
+  if (updated.meta.changes === 0) return null;
+  await deletePreparedQuiz(db, id);
+  return getChallenge(db, id);
 }
 
 export async function markChallengeAutoClosed(db: D1Database, id: string): Promise<void> {

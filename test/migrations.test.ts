@@ -27,5 +27,6 @@ describe("D1 migrations", () => {
     const columns = results.map((r) => r.name);
     expect(columns).toContain("auto_closed_at");
     expect(columns).toContain("terminal_reconciled_at");
+    expect(columns).toContain("delta_base_sha");
   });
 });

@@ -41,6 +41,7 @@ export interface PrContext {
   repoFullName?: string;
   prNumber?: number;
   headSha?: string;
+  deltaBaseSha?: string;
   installationId?: number;
   changedLines?: number;
   filePatches?: PrFilePatch[];
@@ -59,7 +60,7 @@ export interface ResolvedChallenge {
 // All side-effectful collaborators are injected for testability.
 export interface ChallengeDeps {
   generateQuiz(ctx: PrContext, cfg: VouchaConfig): Promise<GenerateResult>;
-  verifyTurnstile(token: string): Promise<boolean>;
+  verifyTurnstile(token: string): Promise<"passed" | "failed" | "unavailable">;
   fetchPrContext(challenge: Challenge): Promise<PrContext>;
   onChallengeResolved(resolved: ResolvedChallenge): Promise<void>;
   now(): Date;
@@ -67,7 +68,7 @@ export interface ChallengeDeps {
 
 export type StartResult =
   | { ok: true; quizId: string }
-  | { ok: false; error: "not_found" | "not_author" | "not_ready" | "cooldown" | "attempts_exhausted" | "rate_limited" | "generation_failed" }
+  | { ok: false; error: "not_found" | "not_author" | "not_ready" | "cooldown" | "attempts_exhausted" | "rate_limited" | "generation_failed" | "turnstile_missing" | "turnstile_unavailable" }
   | { ok: false; error: "bot_detected"; reason: string };
 
 export const TURNSTILE_BOT_FAILURE_REASON = "Turnstile did not validate this browser session.";
@@ -108,13 +109,14 @@ async function failChallengeForBotSignal(
     "UPDATE quizzes SET finished_at=? WHERE challenge_id=? AND finished_at IS NULL"
   ).bind(now.toISOString(), challenge.id).run();
   await env.DB.prepare(
-    `INSERT INTO quizzes (id, challenge_id, attempt_number, questions_json, question_served_at,
+    `INSERT INTO quizzes (id, challenge_id, attempt_number, retry_cycle, questions_json, question_served_at,
        turnstile_ok, telemetry_json, finished_at, score)
-     VALUES (?, ?, ?, '{"questions":[]}', NULL, 0, ?, ?, 0)`
+     VALUES (?, ?, ?, ?, '{"questions":[]}', NULL, 0, ?, ?, 0)`
   ).bind(
     quizId,
     challenge.id,
     challenge.attempts_used + 1,
+    challenge.retry_cycle,
     JSON.stringify({ botFailureReason: reason }),
     now.toISOString()
   ).run();
@@ -193,6 +195,9 @@ export async function startQuizAttempt(
     return { ok: false, error: gate.reason === "not_ready" ? "not_ready" : gate.reason };
   }
 
+  const verifiedTurnstileToken = turnstileToken.trim();
+  if (!verifiedTurnstileToken) return { ok: false, error: "turnstile_missing" };
+
   const rate = await checkAndRecordRate(env.DB, {
     user: `user:${normalizeGitHubLogin(ghLogin)}`,
     repo: `repo:${challenge.repo_full_name}`,
@@ -200,8 +205,22 @@ export async function startQuizAttempt(
   }, now);
   if (!rate.allowed) return { ok: false, error: "rate_limited" };
 
-  const turnstileOk = await deps.verifyTurnstile(turnstileToken);
-  if (!turnstileOk) {
+  const turnstileResult = await deps.verifyTurnstile(verifiedTurnstileToken);
+  if (turnstileResult === "unavailable") {
+    console.error("Turnstile verification unavailable", {
+      challengeId: challenge.id,
+      repo: challenge.repo_full_name,
+      prNumber: challenge.pr_number,
+    });
+    await setChallengeStatus(env.DB, challenge.id, "neutral");
+    await purgeQuizQuestions(env, challenge.id);
+    const fresh = (await getChallenge(env.DB, challenge.id))!;
+    await notifyChallengeResolved(deps, {
+      challenge: fresh, outcome: "neutral", telemetry: null, cfg,
+    });
+    return { ok: false, error: "turnstile_unavailable" };
+  }
+  if (turnstileResult === "failed") {
     return failChallengeForBotSignal(env, deps, challenge, cfg, TURNSTILE_BOT_FAILURE_REASON, now);
   }
 
@@ -250,11 +269,12 @@ export async function startQuizAttempt(
   if (hasHoneypotSignal(cfg) && honeypotTriggered) initialTelemetry.honeypotTriggered = true;
   if (codeHoneypot.triggered) initialTelemetry.codeHoneypotTriggered = true;
   await env.DB.prepare(
-    `INSERT INTO quizzes (id, challenge_id, attempt_number, questions_json, question_served_at, turnstile_ok, telemetry_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO quizzes (id, challenge_id, attempt_number, retry_cycle, questions_json, question_served_at, turnstile_ok, telemetry_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     quizId, challenge.id, challenge.attempts_used + 1,
-    JSON.stringify(generated.quiz), now.toISOString(), turnstileOk ? 1 : 0,
+    challenge.retry_cycle,
+    JSON.stringify(generated.quiz), now.toISOString(), 1,
     JSON.stringify(initialTelemetry)
   ).run();
   return { ok: true, quizId };

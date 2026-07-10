@@ -54,7 +54,10 @@ Walk each scenario that the repository intends to rely on:
 - `prior_merged_prs` exempts an author with enough merged PRs;
 - configured `code_honeypot` patterns appear as maintainer-facing findings when
   introduced in added diff lines;
-- a passed PR keeps or loses its pass according to `rechallenge`.
+- a docs-only delta after a pass carries that pass forward under the default
+  `rechallenge` policy;
+- a meaningful delta after a pass creates a short follow-up quiz scoped only to
+  commits after the passed head.
 
 ## Failure drills
 
@@ -68,7 +71,9 @@ repository policy requirements.
 - Submit a wrong quiz answer. A non-final failure should enter cooldown and a
   later retry should get a fresh quiz.
 - Exhaust all attempts. The check should stay failed for manual maintainer
-  review.
+  review. Comment `/voucha retry` from a write-capable maintainer; VOUCHA
+  should preserve the previous audit and start a fresh challenge on the same
+  commit.
 - With `enforcement.auto_close` enabled, exhaust all attempts or trigger a hard
   assistance failure. The check should stay failed and the PR should close.
 - Leave an awaiting or ready challenge untouched. The scheduled sweep should
@@ -100,7 +105,8 @@ security boundary.
   key.
 - Webhook handling is asynchronous. If background work fails after GitHub
   accepts the webhook, recovery depends on GitHub redelivery, idempotent event
-  handling, and the scheduled sweep.
+  handling, the scheduled sweep, and maintainer-triggered `/voucha retry` for a
+  terminal challenge after the service recovers.
 - PR comment lookup currently checks one page of issue comments. Very noisy PRs
   can receive a duplicate VOUCHA comment if the tracked comment is beyond
   that page.
