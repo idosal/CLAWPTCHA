@@ -1,7 +1,6 @@
 // test/grade.test.ts
 import { describe, it, expect } from "vitest";
 import {
-  EXTENDED_QUESTION_TIME_LIMIT_MS,
   QUESTION_TIME_LIMIT_MS,
   answerWithinTimeLimit,
   canStartAttempt,
@@ -67,16 +66,6 @@ describe("question time limit", () => {
     expect(questionRemainingMs(servedAt, new Date("2026-07-02T12:00:20.000Z"), 60_000)).toBe(40_000);
     expect(questionRemainingMs(servedAt, new Date("2026-07-02T12:01:01.000Z"), 60_000)).toBe(0);
     expect(questionRemainingMs("invalid", new Date("2026-07-02T12:00:20.000Z"), 60_000)).toBe(0);
-  });
-
-  it("supports the opt-in 10x timing accommodation", () => {
-    expect(EXTENDED_QUESTION_TIME_LIMIT_MS).toBe(600_000);
-    const servedAt = "2026-07-02T12:00:00.000Z";
-    expect(answerWithinTimeLimit(
-      servedAt,
-      new Date("2026-07-02T12:10:15.000Z"),
-      EXTENDED_QUESTION_TIME_LIMIT_MS
-    )).toBe(true);
   });
 });
 

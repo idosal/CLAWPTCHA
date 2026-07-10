@@ -20,7 +20,6 @@ import {
   scoreQuiz,
   nextCooldown,
   answerWithinTimeLimit,
-  EXTENDED_QUESTION_TIME_LIMIT_MS,
   QUESTION_TIME_LIMIT_MS,
   type Answer,
 } from "./quiz/grade";
@@ -193,7 +192,7 @@ export async function prepareQuizForChallenge(
 
 export async function startQuizAttempt(
   env: Env, deps: ChallengeDeps, challengeId: string, ghLogin: string, turnstileToken: string,
-  honeypotTriggered = false, useExtendedTiming = false
+  honeypotTriggered = false
 ): Promise<StartResult> {
   const challenge = await getChallenge(env.DB, challengeId);
   if (!challenge) return { ok: false, error: "not_found" };
@@ -287,7 +286,7 @@ export async function startQuizAttempt(
     quizId, challenge.id, challenge.attempts_used + 1,
     challenge.retry_cycle,
     JSON.stringify(generated.quiz),
-    useExtendedTiming ? EXTENDED_QUESTION_TIME_LIMIT_MS : QUESTION_TIME_LIMIT_MS,
+    QUESTION_TIME_LIMIT_MS,
     1,
     JSON.stringify(initialTelemetry)
   ).run();

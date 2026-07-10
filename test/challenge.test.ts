@@ -7,7 +7,7 @@ import {
 import { getPreparedQuiz, insertChallenge, randomToken, getChallenge, upsertPreparedQuiz } from "../src/store";
 import { DEFAULT_CONFIG } from "../src/config";
 import type { Env } from "../src/types";
-import { EXTENDED_QUESTION_TIME_LIMIT_MS, QUESTION_TIME_LIMIT_MS } from "../src/quiz/grade";
+import { QUESTION_TIME_LIMIT_MS } from "../src/quiz/grade";
 import { STRONG_TIMING_FAILURE_REASON } from "../src/risk/report";
 
 const testEnv = env as unknown as Env;
@@ -74,15 +74,6 @@ describe("startQuizAttempt", () => {
       "SELECT question_served_at, time_limit_ms FROM quizzes WHERE id=?"
     ).bind(r.quizId).first<{ question_served_at: string | null; time_limit_ms: number }>();
     expect(row).toEqual({ question_served_at: null, time_limit_ms: QUESTION_TIME_LIMIT_MS });
-  });
-
-  it("stores the opt-in extended timing accommodation on the attempt", async () => {
-    const id = await makeChallenge();
-    const r = await startQuizAttempt(testEnv, deps(), id, "alice", "tok", false, true);
-    if (!r.ok) throw new Error("setup failed");
-    const row = await testEnv.DB.prepare("SELECT time_limit_ms FROM quizzes WHERE id=?")
-      .bind(r.quizId).first<{ time_limit_ms: number }>();
-    expect(row?.time_limit_ms).toBe(EXTENDED_QUESTION_TIME_LIMIT_MS);
   });
 
   it("uses a prepared quiz after Turnstile without generating during start", async () => {

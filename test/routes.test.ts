@@ -342,52 +342,6 @@ describe("POST /challenge/:id/start", () => {
     expect(row?.count).toBe(0);
   });
 
-  it("persists the extended timing option selected on the start form", async () => {
-    await testEnv.DB.prepare(
-      `INSERT INTO challenges (id, installation_id, repo_full_name, pr_number, head_sha,
-        author_login, status, config_json) VALUES ('chExtended', 1, 'o/r', 10, 's10', 'alice', 'ready', '{}')`
-    ).run();
-    await testEnv.DB.prepare(
-      "INSERT INTO sessions (id, challenge_id, gh_login) VALUES ('sessExtended', 'chExtended', 'alice')"
-    ).run();
-    const preparedQuiz = {
-      questions: [0, 1, 2, 3].map((index) => ({
-        type: "consequence_mcq",
-        prompt: `Question ${index + 1} is long enough`,
-        options: ["a", "b", "c", "d"],
-        correct: [0],
-      })),
-    };
-    await testEnv.DB.prepare(
-      "INSERT INTO prepared_quizzes (challenge_id, questions_json) VALUES (?, ?)"
-    ).bind("chExtended", JSON.stringify(preparedQuiz)).run();
-    const cookie = await signSessionCookie(testEnv.SESSION_SIGNING_KEY, "sessExtended");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })));
-    try {
-      const res = await worker.fetch(new Request("https://x/challenge/chExtended/start", {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          cookie: `voucha_session=${cookie}`,
-        },
-        body: new URLSearchParams({
-          terms_acceptance: "accepted",
-          extended_timing: "extended",
-          "cf-turnstile-response": "tok",
-        }),
-      }), testEnv, createExecutionContext());
-      expect(res.status).toBe(302);
-      const row = await testEnv.DB.prepare(
-        "SELECT question_served_at, time_limit_ms FROM quizzes WHERE challenge_id='chExtended'"
-      ).first<{ question_served_at: string | null; time_limit_ms: number }>();
-      expect(row).toEqual({ question_served_at: null, time_limit_ms: 600_000 });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
 });
 
 describe("challengeDeps.generateQuiz fail-open seam", () => {

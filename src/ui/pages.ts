@@ -17,7 +17,6 @@ export interface ChallengeContract {
   questions: number;
   passThreshold: number;
   secondsPerQuestion: number;
-  extendedSecondsPerQuestion: number;
   maxAttempts: number;
   attemptsUsed: number;
   cooldownMinutes: number;
@@ -1104,34 +1103,12 @@ h1{
   gap:12px;
   margin-top:28px;
 }
-.turnstile-box{
-  position:relative;
-  min-height:76px;
-  min-width:min(100%,320px);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:10px;
-  border:1px solid var(--line);
-  border-radius:var(--radius-sm);
-  background:var(--panel);
-}
+.turnstile-mode{min-width:0; min-height:0}
 .cf-turnstile{
   position:relative;
   z-index:1;
   min-height:0;
 }
-.turnstile-fallback{
-  position:absolute;
-  inset:0;
-  display:grid;
-  place-items:center;
-  padding:12px;
-  color:var(--ink-faint);
-  font-size:.9rem;
-  text-align:center;
-}
-.turnstile-box:has(.cf-turnstile iframe) .turnstile-fallback{display:none}
 .privacy-note{
   display:grid;
   gap:10px;
@@ -1186,7 +1163,7 @@ h1{
   color:var(--accent);
   font-weight:740;
 }
-.consent-check,.timing-option{
+.consent-check{
   display:grid;
   grid-template-columns:22px minmax(0,1fr);
   gap:10px;
@@ -1199,49 +1176,27 @@ h1{
   color:var(--ink-dim);
   cursor:pointer;
 }
-.consent-check input,.timing-option input{
+.consent-check input{
   width:18px;
   height:18px;
   margin:2px 0 0;
   accent-color:var(--brand);
 }
-.consent-check span,.timing-option span{
+.consent-check span{
   overflow-wrap:anywhere;
 }
-.consent-check strong,.timing-option strong{
+.consent-check strong{
   display:block;
   color:var(--ink);
   font-weight:760;
 }
-.consent-check small,.timing-option small{
+.consent-check small{
   display:block;
   margin-top:3px;
   color:var(--ink-faint);
   font-size:.86rem;
   line-height:1.38;
 }
-.timing-option{
-  min-width:min(100%,520px);
-  padding:11px 14px;
-  border:1px solid var(--line);
-  border-radius:var(--radius-sm);
-  background:var(--panel);
-  color:var(--ink-dim);
-  cursor:pointer;
-}
-.signal-disclosure{
-  display:grid;
-  gap:6px;
-  max-width:68ch;
-  padding:12px 14px;
-  border:1px solid var(--line);
-  border-radius:var(--radius-sm);
-  background:var(--panel);
-  color:var(--ink-dim);
-  font-size:.86rem;
-  line-height:1.42;
-}
-.signal-disclosure strong{color:var(--ink); font-weight:740}
 .question-support{
   display:flex;
   align-items:center;
@@ -1903,7 +1858,6 @@ body:not(.site-body) .terms-stack{
   gap:8px;
 }
 body:not(.site-body) .consent-check,
-body:not(.site-body) .timing-option,
 body:not(.site-body) .command-card{
   min-width:0;
   max-width:640px;
@@ -1915,13 +1869,11 @@ body:not(.site-body) .consent-check input{
   accent-color:var(--brand);
 }
 body:not(.site-body) .consent-check strong,
-body:not(.site-body) .timing-option strong,
 body:not(.site-body) .command-card strong{
   font-size:.94rem;
   font-weight:600;
 }
 body:not(.site-body) .consent-check small,
-body:not(.site-body) .timing-option small,
 body:not(.site-body) .command-card small{
   color:var(--ink-dim);
   font-size:.87rem;
@@ -1957,14 +1909,6 @@ body:not(.site-body) .data-line a,
 body:not(.site-body) .inline-link{
   color:var(--brand);
   font-weight:600;
-}
-body:not(.site-body) .turnstile-box{
-  min-width:0;
-  width:320px;
-  min-height:72px;
-  padding:8px;
-  border-radius:6px;
-  background:#f6f8fa;
 }
 body:not(.site-body) .btn,
 body:not(.site-body) .btn-secondary{
@@ -2256,8 +2200,6 @@ body:not(.site-body) .state-card p{
   body:not(.site-body) .app,
   body:not(.site-body) .commandbar,
   body:not(.site-body) .consent-check,
-  body:not(.site-body) .timing-option,
-  body:not(.site-body) .signal-disclosure,
   body:not(.site-body) .command-card,
   body:not(.site-body) .state-card{
     background:var(--canvas);
@@ -2265,7 +2207,6 @@ body:not(.site-body) .state-card p{
   body:not(.site-body) .command-pill,
   body:not(.site-body) .pill,
   body:not(.site-body) .inline-note,
-  body:not(.site-body) .turnstile-box,
   body:not(.site-body) .actionbar,
   body:not(.site-body) .timer,
   body:not(.site-body) .choice-letter{
@@ -2644,10 +2585,6 @@ body:not(.site-body) .state-card p{
     grid-template-columns:minmax(0,1fr);
     align-items:stretch;
   }
-  body:not(.site-body) .turnstile-box{
-    width:100%;
-    max-width:320px;
-  }
   body:not(.site-body) .btn,
   body:not(.site-body) .btn-secondary{
     width:100%;
@@ -2731,15 +2668,10 @@ body:not(.site-body) .state-card p{
   }
   body:not(.site-body) .inline-note,
   body:not(.site-body) .consent-check,
-  body:not(.site-body) .timing-option,
-  body:not(.site-body) .signal-disclosure,
   body:not(.site-body) .command-card,
   body:not(.site-body) .state-card,
   body:not(.site-body) .status-strip{
     border-radius:6px;
-  }
-  body:not(.site-body) .turnstile-box{
-    max-width:100%;
   }
   body:not(.site-body) .actionbar{
     align-items:stretch;
@@ -5071,7 +5003,7 @@ function contextPanel(
   const specs: Record<"verify" | "start" | "question", {
     heading: string;
     items: Array<[icon: string, label: string, detail: string]>;
-    note: string;
+    note?: string;
   }> = {
     verify: {
       heading: "What to do",
@@ -5089,7 +5021,6 @@ function contextPanel(
         [timeLabel, "Per question", `A ${timeLabel} timer, then it advances.`],
         ["✓", "On finish", "Your result posts to the PR as a check."],
       ],
-      note: "Your answers and timing summaries stay with maintainers.",
     },
     question: {
       heading: "During the quiz",
@@ -5113,9 +5044,9 @@ function contextPanel(
       ${items}
     </div>
   </section>
-  <section class="context-section">
+  ${spec.note ? `<section class="context-section">
     <p class="data-line">${esc(spec.note)} <a class="inline-link" href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Read details</a></p>
-  </section>
+  </section>` : ""}
 </aside>`;
 }
 
@@ -5463,8 +5394,7 @@ export function startPage(
     questions: 4,
     passThreshold: 3,
     secondsPerQuestion: 60,
-    extendedSecondsPerQuestion: 600,
-    maxAttempts: 3,
+  maxAttempts: 3,
     attemptsUsed: 0,
     cooldownMinutes: 15,
   }
@@ -5497,20 +5427,11 @@ export function startPage(
             <p class="author-rule"><strong>AI-written code may be allowed.</strong> These challenge answers must be yours.</p>
             <label class="consent-check">
               <input type="checkbox" name="terms_acceptance" value="accepted" required>
-              <span><strong>I understand the challenge rules.</strong><small>Generate a PR-specific quiz, post the result to the PR, and retain my answers plus the disclosed summaries for maintainers.</small></span>
+              <span><strong>I understand the challenge rules.</strong><small>Generate a PR-specific quiz and post the result to the PR.</small></span>
             </label>
-            <label class="timing-option">
-              <input type="checkbox" name="extended_timing" value="extended">
-              <span><strong>Use extended timing</strong><small>${Math.round(contract.extendedSecondsPerQuestion / 60)} minutes per question instead of ${contract.secondsPerQuestion} seconds. No explanation required.</small></span>
-            </label>
-            <div class="signal-disclosure" role="note" aria-label="Challenge data disclosure">
-              <p><strong>Recorded:</strong> selected answers, server-measured timing, answer changes, tab changes, and summary pointer/browser signals.</p>
-              <p><strong>Never recorded:</strong> keystrokes, written content, screen, webcam, or microphone.</p>
-              <p><strong>Outcome:</strong> repeated, server-measured sub-two-second answers or failed browser verification can invalidate a pass. Inconclusive interaction signals are report-only.</p>
-            </div>
-            <p class="data-line">Privacy, retention, and permission details live in the docs. <a href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Read details</a>.</p>
+            <p class="data-line"><a href="/docs/privacy-data/" target="_blank" rel="noopener noreferrer">Privacy and data details</a></p>
           </div>
-          <div class="turnstile-box" aria-label="Browser verification"><div class="cf-turnstile" data-sitekey="${esc(turnstileSiteKey)}" data-callback="vouchaTurnstileReady" data-expired-callback="vouchaTurnstileExpired" data-error-callback="vouchaTurnstileExpired" data-timeout-callback="vouchaTurnstileExpired"></div><span class="turnstile-fallback">Browser verification</span></div>
+          <div class="turnstile-mode"><div class="cf-turnstile" data-sitekey="${esc(turnstileSiteKey)}" data-appearance="interaction-only" data-callback="vouchaTurnstileReady" data-expired-callback="vouchaTurnstileExpired" data-error-callback="vouchaTurnstileExpired" data-timeout-callback="vouchaTurnstileExpired"></div></div>
           <button class="btn" type="submit" id="startButton" disabled>Verifying browser...</button>
           <div class="start-progress" id="startProgress" role="status" aria-live="polite" hidden>
             <div><strong id="startProgressTitle">Preparing the quiz</strong><p id="startProgressMessage">This can take a moment while VOUCHA reads the PR and asks the model for questions.</p></div>

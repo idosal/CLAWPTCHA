@@ -67,11 +67,10 @@ describe("challenge pages", () => {
     expect(start).toContain("post the result to the PR");
     expect(start).toContain("4</b> questions");
     expect(start).toContain("3/4</b> passes");
-    expect(start).toContain('name="extended_timing"');
-    expect(start).toContain("10 minutes per question");
-    expect(start).toContain("server-measured sub-two-second answers");
-    expect(start).toContain("Inconclusive interaction signals are report-only");
-    expect(start).toContain("Never recorded:");
+    expect(start).not.toContain('name="extended_timing"');
+    expect(start).not.toContain("Recorded:");
+    expect(start).not.toContain("Never recorded:");
+    expect(start).not.toContain("Outcome:");
     expect(start).toContain("/docs/privacy-data/");
     expect(start).toContain("Preparing the quiz");
     expect(start).toContain("Reading the pull request");
@@ -79,6 +78,8 @@ describe("challenge pages", () => {
     expect(start).toContain("First runs and larger diffs can take a little longer.");
     expect(start).toContain('data-callback="vouchaTurnstileReady"');
     expect(start).toContain('data-expired-callback="vouchaTurnstileExpired"');
+    expect(start).toContain('data-appearance="interaction-only"');
+    expect(start).not.toContain("turnstile-fallback");
     expect(start).toContain('<button class="btn" type="submit" id="startButton" disabled>Verifying browser...</button>');
     expect(start).toContain("window.vouchaTurnstileVerified = false");
     expect(questionHtml).toContain(`name="${HONEYPOT_FIELD_NAME}"`);

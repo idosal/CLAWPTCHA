@@ -30,7 +30,6 @@ import { prepareQuizForChallenge, startQuizAttempt, submitAnswer, type Challenge
 import { generateQuiz, generateQuizFromInvestigation } from "./quiz/generate";
 import { redactForClient, type Quiz } from "./quiz/schema";
 import {
-  EXTENDED_QUESTION_TIME_LIMIT_MS,
   QUESTION_TIME_LIMIT_MS,
   questionRemainingMs,
 } from "./quiz/grade";
@@ -175,7 +174,6 @@ function renderStartPage(
       questions: getMultipleChoiceGate(cfg).questions,
       passThreshold: getMultipleChoiceGate(cfg).pass_threshold,
       secondsPerQuestion: QUESTION_TIME_LIMIT_MS / 1000,
-      extendedSecondsPerQuestion: EXTENDED_QUESTION_TIME_LIMIT_MS / 1000,
       maxAttempts: cfg.max_attempts,
       attemptsUsed: challenge.attempts_used,
       cooldownMinutes: cfg.cooldown_minutes,
@@ -608,7 +606,7 @@ app.post("/challenge/:id/start", async (c) => {
   const result = await startQuizAttempt(
     c.env, challengeDeps(c.env), c.req.param("id"),
     session.gh_login, String(form["cf-turnstile-response"] ?? ""),
-    hasSubmittedHoneypot(form), form["extended_timing"] === "extended"
+    hasSubmittedHoneypot(form)
   );
   if (!result.ok) {
     if (result.error === "turnstile_missing") {
