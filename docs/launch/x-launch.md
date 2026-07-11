@@ -12,9 +12,10 @@ Publish the main post after:
   `pr-comprehension:passed` label;
 - the final video cut replaces the pending state with that completed result.
 
-The current 26-second draft video is
+The final 26-second video is
 [`assets/voucha-x-demo.mp4`](assets/voucha-x-demo.mp4). It uses only real
-VOUCHA and GitHub screens and deliberately does not fabricate a passed result.
+VOUCHA and GitHub screens, including the completed challenge, green check,
+attestation, and maintainer risk report from the curated demo PR.
 
 ## Main post
 

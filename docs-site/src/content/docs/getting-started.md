@@ -28,7 +28,7 @@ for the first repository.
 See the entire hosted flow on the
 [public demo pull request](https://github.com/idosal/voucha-owner-check-e2e/pull/11).
 
-![A live VOUCHA comment using repository-specific contributor wording](https://raw.githubusercontent.com/idosal/voucha-owner-check-e2e/main/docs/screenshots/voucha-custom-comment.jpg)
+![A live VOUCHA comment recording a passed challenge and maintainer risk report](https://raw.githubusercontent.com/idosal/voucha-owner-check-e2e/main/docs/screenshots/voucha-custom-comment.jpg)
 
 ## 2. Add the first policy file
 

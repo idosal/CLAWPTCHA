@@ -11,7 +11,7 @@ attestation; maintainers get a behavioral risk report.
 · **[See the live demo](https://github.com/idosal/voucha-owner-check-e2e/pull/11)**
 · **[Read the docs](https://voucha.dev/docs/)**
 
-![VOUCHA uses repository-specific contributor wording in its managed pull request comment](https://raw.githubusercontent.com/idosal/voucha-owner-check-e2e/main/docs/screenshots/voucha-custom-comment.jpg)
+![VOUCHA records a passed challenge and maintainer risk report in its managed pull request comment](https://raw.githubusercontent.com/idosal/voucha-owner-check-e2e/main/docs/screenshots/voucha-custom-comment.jpg)
 
 The hosted app is free for public repositories. Install it, select a repository,
 and open a pull request; the built-in defaults work without a policy file.
