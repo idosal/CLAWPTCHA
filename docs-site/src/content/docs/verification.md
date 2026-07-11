@@ -38,6 +38,9 @@ Use a demo repository with the GitHub App installed.
   and answer the quiz.
 - Confirm the check turns green, the PR comment records the attestation, and
   the check-run output includes the risk report.
+- On a clean pass with `output.labels.passed` enabled, confirm the PR receives
+  `pr-comprehension:passed` and no longer carries `pr-comprehension:failed` or
+  a stale `pr-comprehension:flagged` label.
 
 ## Policy scenarios
 
@@ -70,7 +73,8 @@ repository policy requirements.
   generation should become neutral.
 - Submit a wrong quiz answer. A non-final failure should offer **Try again** in
   the app immediately by default, without requiring a return to GitHub, and the
-  retry should get a fresh quiz.
+  retry should get a fresh quiz. With `output.labels.failed` enabled, the PR
+  should receive `pr-comprehension:failed` and drop stale success labels.
 - Exhaust all attempts. The check should stay failed for manual maintainer
   review. Comment `/voucha retry` from a write-capable maintainer; VOUCHA
   should preserve the previous audit and start a fresh challenge on the same
@@ -89,7 +93,9 @@ For each rollout, record:
 - expected and observed check conclusion;
 - whether a PR comment was created or updated;
 - whether the author-facing quiz link worked;
-- any risk-report signals, labels, or neutral outcomes;
+- the configured label object and observed passed, failed, or flagged label
+  transitions;
+- any risk-report signals or neutral outcomes;
 - whether the result was acceptable for branch protection.
 
 ## Known limitations

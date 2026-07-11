@@ -6,7 +6,10 @@ Publish the main post after:
 
 - the GitHub App listing uses the VOUCHA identity, logo, description, and
   support/privacy links;
-- the curated demo PR has a current completed VOUCHA result;
+- the demo repository policy uses the nested `output.labels` object with
+  `passed`, `failed`, and `flagged` switches;
+- the curated demo PR has a current completed VOUCHA result and its configured
+  `pr-comprehension:passed` label;
 - the final video cut replaces the pending state with that completed result.
 
 The current 26-second draft video is
@@ -34,7 +37,7 @@ The post is 279 characters as written.
 
 > Here is the complete workflow on a small public PR: the repository policy,
 > VOUCHA check, author verification, diff-specific challenge, and recorded
-> result.
+> result—including the PR label selected by repository settings.
 >
 > https://github.com/idosal/voucha-owner-check-e2e/pull/10
 
@@ -103,7 +106,7 @@ Sources for the outreach rationale:
 | Day | Action | Evidence to collect |
 | --- | --- | --- |
 | 0 | Publish the video and reply thread; contact the first three design-partner candidates individually | Link clicks, install events, substantive maintainer replies |
-| 1 | Post the smallest useful `.github/voucha.yml` example | Config questions and objections |
+| 1 | Post the smallest useful `.github/voucha.yml` example, including outcome-specific label settings | Config questions and objections |
 | 2 | Share the completed demo result and explain what VOUCHA stores | Challenge starts/completions and privacy questions |
 | 3 | Publish “not an AI detector” positioning with the failure posture | Quality of discussion, not impressions |
 | 5 | Share one real maintainer setup or an honest no-fit outcome | Time-to-first-check and noise introduced |

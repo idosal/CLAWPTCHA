@@ -54,6 +54,10 @@ skip_paths: ["docs/**", "*.md"]
 min_changed_lines: 10
 output:
   comments: normal
+  labels:
+    passed: false
+    failed: true
+    flagged: true
   contributor_message: >
     Thanks for contributing, {{author}}. Please complete this short check
     when you're ready.
@@ -62,6 +66,9 @@ output:
 This gives first-time contributors a maintainer checkpoint before the quiz,
 keeps draft PRs quiet until they are ready for review, skips docs-only work,
 and records the default form honeypot signal as review evidence.
+The label object keeps successful PRs quiet by default, makes failures visible
+from the PR list, and flags suspicious passes. Set `passed: true` when the
+repository also wants a durable success label.
 `contributor_message` is optional; it lets the repository set the tone of the
 action-required PR comment while VOUCHA keeps the challenge link and status
 wording consistent.
@@ -79,7 +86,8 @@ Before tightening policy, open or replay a few predictable PRs:
 - a docs-only PR should get an exempt success check;
 - a first-time contributor PR should wait for `/voucha approve`;
 - a normal challenged PR should produce a quiz link, pass, and then post a
-  green attestation check;
+  green attestation check; if `output.labels.passed` is enabled, it should also
+  replace any stale failure label with `pr-comprehension:passed`;
 - a failed quiz should offer an immediate fresh retry by default;
 - a meaningful code commit after a pass should create a two-question follow-up
   quiz scoped to that delta; a docs/Markdown-only commit should carry the pass
