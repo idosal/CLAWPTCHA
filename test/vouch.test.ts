@@ -28,6 +28,12 @@ describe("parseVouchStatus", () => {
 
     expect(parseVouchStatus(content, "alice")).toBe("vouched");
   });
+
+  it("normalizes whitespace around GitHub handles and the requested login", () => {
+    const content = "   github:OctoCat   trusted contributor   \n";
+
+    expect(parseVouchStatus(content, "  octocat  ")).toBe("vouched");
+  });
 });
 
 describe("evaluateVouchTrust", () => {
