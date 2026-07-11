@@ -87,7 +87,7 @@ Before tightening policy, open or replay a few predictable PRs:
 - a first-time contributor PR should wait for `/voucha approve`;
 - a normal challenged PR should produce a quiz link, pass, and then post a
   green attestation check; if `output.labels.passed` is enabled, it should also
-  replace any stale failure label with `pr-comprehension:passed`;
+  replace any stale failure label with `VOUCHA:passed`;
 - a failed quiz should offer an immediate fresh retry by default;
 - a meaningful code commit after a pass should create a two-question follow-up
   quiz scoped to that delta; a docs/Markdown-only commit should carry the pass

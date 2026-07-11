@@ -405,8 +405,8 @@ output:
 ```
 
 `comments` accepts `quiet`, `normal`, or `detailed`. The nested `labels`
-switches independently control `pr-comprehension:passed`,
-`pr-comprehension:failed`, and `pr-comprehension:flagged`. VOUCHA removes stale
+switches independently control `VOUCHA:passed`, `VOUCHA:failed`, and
+`VOUCHA:flagged`. VOUCHA removes stale
 outcome labels as the check moves between passing and failing states. The
 flagged label remains defense in depth for passed legacy/imported records with
 strong automation evidence; inconclusive signals never add it.

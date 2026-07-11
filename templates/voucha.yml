@@ -89,9 +89,9 @@ max_context_tokens: null
 output:
   comments: normal
   labels:
-    passed: false # add pr-comprehension:passed after a pass
-    failed: true # add pr-comprehension:failed while the check is failing
-    flagged: true # add pr-comprehension:flagged on a suspicious pass
+    passed: false # add VOUCHA:passed after a pass
+    failed: true # add VOUCHA:failed while the check is failing
+    flagged: true # add VOUCHA:flagged on a suspicious pass
   # Optional Markdown intro for the action-required comment. Available
   # placeholders: {{author}}, {{max_attempts}}, {{challenge_url}}.
   contributor_message: null

@@ -6,15 +6,20 @@ import { getInstallationToken } from "./github/auth";
 import { buildRiskReport, renderRiskReportMarkdown } from "./risk/report";
 import { markChallengeAutoClosed, markChallengeTerminalReconciled } from "./store";
 
-const FLAGGED_LABEL = "pr-comprehension:flagged";
+const FLAGGED_LABEL = "VOUCHA:flagged";
 const FLAGGED_LABEL_COLOR = "b60205";
-const FLAGGED_LABEL_DESCRIPTION = "Strong automation evidence requires review on this PR comprehension record.";
-const PASSED_LABEL = "pr-comprehension:passed";
+const FLAGGED_LABEL_DESCRIPTION = "VOUCHA recorded strong automation evidence for maintainer review.";
+const PASSED_LABEL = "VOUCHA:passed";
 const PASSED_LABEL_COLOR = "0e8a16";
-const PASSED_LABEL_DESCRIPTION = "The VOUCHA comprehension check passed.";
-const FAILED_LABEL = "pr-comprehension:failed";
+const PASSED_LABEL_DESCRIPTION = "VOUCHA verification passed.";
+const FAILED_LABEL = "VOUCHA:failed";
 const FAILED_LABEL_COLOR = "b60205";
-const FAILED_LABEL_DESCRIPTION = "The VOUCHA comprehension check is currently failing.";
+const FAILED_LABEL_DESCRIPTION = "VOUCHA verification is currently failing.";
+const LEGACY_LABELS = [
+  "pr-comprehension:passed",
+  "pr-comprehension:failed",
+  "pr-comprehension:flagged",
+] as const;
 
 function challengeUrl(env: Env, challengeId: string): string {
   return `${env.APP_BASE_URL}/challenge/${challengeId}`;
@@ -150,6 +155,10 @@ async function clearLabel(api: GitHubApi, repo: string, pr: number, label: strin
   } catch { /* label reconciliation must not override the check-run outcome */ }
 }
 
+async function clearLegacyLabels(api: GitHubApi, repo: string, pr: number): Promise<void> {
+  for (const label of LEGACY_LABELS) await clearLabel(api, repo, pr, label);
+}
+
 async function reconcileFailureLabels(
   api: GitHubApi,
   repo: string,
@@ -196,6 +205,8 @@ export async function onChallengeResolved(
   const riskMd = renderRiskReportMarkdown(report, r.telemetry);
   const commentsEnabled = r.cfg.output.comments !== "quiet";
   const detailedComments = r.cfg.output.comments === "detailed";
+
+  await clearLegacyLabels(api, repo, pr);
 
   switch (r.outcome) {
     case "passed": {

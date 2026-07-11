@@ -9,7 +9,7 @@ Publish the main post after:
 - the demo repository policy uses the nested `output.labels` object with
   `passed`, `failed`, and `flagged` switches;
 - the curated demo PR has a current completed VOUCHA result and its configured
-  `pr-comprehension:passed` label;
+  `VOUCHA:passed` label;
 - the final video cut replaces the pending state with that completed result.
 
 The final 26-second video is

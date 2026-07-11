@@ -94,11 +94,11 @@ describe("onChallengeResolved", () => {
 
     expect(api.ensureLabel).toHaveBeenCalledWith(
       "o/r",
-      "pr-comprehension:flagged",
+      "VOUCHA:flagged",
       "b60205",
-      "Strong automation evidence requires review on this PR comprehension record."
+      "VOUCHA recorded strong automation evidence for maintainer review."
     );
-    expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["pr-comprehension:flagged"]);
+    expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["VOUCHA:flagged"]);
 
     const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(patch.output.title).toBe("Passed — strong automation evidence requires review");
@@ -118,6 +118,9 @@ describe("onChallengeResolved", () => {
 
     expect(api.ensureLabel).not.toHaveBeenCalled();
     expect(api.addLabels).not.toHaveBeenCalled();
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:failed");
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:passed");
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:flagged");
     expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:failed");
     expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:passed");
     expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:flagged");
@@ -142,11 +145,11 @@ describe("onChallengeResolved", () => {
 
     expect(api.ensureLabel).toHaveBeenCalledWith(
       "o/r",
-      "pr-comprehension:passed",
+      "VOUCHA:passed",
       "0e8a16",
-      "The VOUCHA comprehension check passed."
+      "VOUCHA verification passed."
     );
-    expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["pr-comprehension:passed"]);
+    expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["VOUCHA:passed"]);
   });
 
   it("suppresses outcome comments when output comments are quiet", async () => {
@@ -177,6 +180,7 @@ describe("onChallengeResolved", () => {
 
     expect(api.ensureLabel).not.toHaveBeenCalled();
     expect(api.addLabels).not.toHaveBeenCalled();
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:flagged");
     expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:flagged");
     const [, , patch] = (api.updateCheckRun as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(patch.output.title).toBe("Passed — strong automation evidence requires review");
@@ -200,13 +204,14 @@ describe("onChallengeResolved", () => {
     expect(api.upsertPrComment).toHaveBeenCalledWith("o/r", 1, expect.stringContaining("Retry immediately"));
     expect(api.ensureLabel).toHaveBeenCalledWith(
       "o/r",
-      "pr-comprehension:failed",
+      "VOUCHA:failed",
       "b60205",
-      "The VOUCHA comprehension check is currently failing."
+      "VOUCHA verification is currently failing."
     );
-    expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["pr-comprehension:failed"]);
+    expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["VOUCHA:failed"]);
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:passed");
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:flagged");
     expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:passed");
-    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:flagged");
   });
 
   it("reports a configured retry cooldown", async () => {
@@ -246,11 +251,11 @@ describe("onChallengeResolved", () => {
 
       expect(api.ensureLabel).toHaveBeenCalledWith(
         "o/r",
-        "pr-comprehension:failed",
+        "VOUCHA:failed",
         "b60205",
-        "The VOUCHA comprehension check is currently failing."
+        "VOUCHA verification is currently failing."
       );
-      expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["pr-comprehension:failed"]);
+      expect(api.addLabels).toHaveBeenCalledWith("o/r", 1, ["VOUCHA:failed"]);
     }
   );
 
@@ -271,6 +276,7 @@ describe("onChallengeResolved", () => {
 
     expect(api.ensureLabel).not.toHaveBeenCalled();
     expect(api.addLabels).not.toHaveBeenCalled();
+    expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "VOUCHA:failed");
     expect(api.removeLabel).toHaveBeenCalledWith("o/r", 1, "pr-comprehension:failed");
     expect(api.updateCheckRun).toHaveBeenCalledWith(
       "o/r", 42, expect.objectContaining({ conclusion: "failure" })

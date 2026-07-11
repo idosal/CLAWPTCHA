@@ -205,22 +205,22 @@ describe("GitHubApi", () => {
   });
 
   it("adds labels to a PR via the issues labels endpoint", async () => {
-    const f = mockFetch(200, [{ name: "pr-comprehension:flagged" }]);
+    const f = mockFetch(200, [{ name: "VOUCHA:flagged" }]);
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    await api.addLabels("o/r", 5, ["pr-comprehension:flagged"]);
+    await api.addLabels("o/r", 5, ["VOUCHA:flagged"]);
     const [url, init] = f.mock.calls[0];
     expect(String(url)).toBe("https://api.github.com/repos/o/r/issues/5/labels");
     expect(init!.method).toBe("POST");
-    expect(JSON.parse(init!.body as string)).toEqual({ labels: ["pr-comprehension:flagged"] });
+    expect(JSON.parse(init!.body as string)).toEqual({ labels: ["VOUCHA:flagged"] });
   });
 
   it("removes a label from a PR via the issues labels endpoint", async () => {
-    const f = mockFetch(200, { name: "pr-comprehension:failed" });
+    const f = mockFetch(200, { name: "VOUCHA:failed" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    await api.removeLabel("o/r", 5, "pr-comprehension:failed");
+    await api.removeLabel("o/r", 5, "VOUCHA:failed");
     const [url, init] = f.mock.calls[0];
     expect(String(url)).toBe(
-      "https://api.github.com/repos/o/r/issues/5/labels/pr-comprehension%3Afailed"
+      "https://api.github.com/repos/o/r/issues/5/labels/VOUCHA%3Afailed"
     );
     expect(init!.method).toBe("DELETE");
   });
@@ -240,24 +240,24 @@ describe("GitHubApi", () => {
       if (!init?.method || init.method === "GET") {
         return new Response(JSON.stringify({ message: "Not Found" }), { status: 404 });
       }
-      return new Response(JSON.stringify({ name: "pr-comprehension:flagged" }), { status: 201 });
+      return new Response(JSON.stringify({ name: "VOUCHA:flagged" }), { status: 201 });
     });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    await api.ensureLabel("o/r", "pr-comprehension:flagged", "b60205", "Multiple passive risk signals");
+    await api.ensureLabel("o/r", "VOUCHA:flagged", "b60205", "Multiple passive risk signals");
 
-    expect(String(f.mock.calls[0][0])).toBe("https://api.github.com/repos/o/r/labels/pr-comprehension%3Aflagged");
+    expect(String(f.mock.calls[0][0])).toBe("https://api.github.com/repos/o/r/labels/VOUCHA%3Aflagged");
     expect(String(f.mock.calls[1][0])).toBe("https://api.github.com/repos/o/r/labels");
     expect(JSON.parse(f.mock.calls[1][1]!.body as string)).toEqual({
-      name: "pr-comprehension:flagged",
+      name: "VOUCHA:flagged",
       color: "b60205",
       description: "Multiple passive risk signals",
     });
   });
 
   it("does not recreate an existing label", async () => {
-    const f = mockFetch(200, { name: "pr-comprehension:flagged" });
+    const f = mockFetch(200, { name: "VOUCHA:flagged" });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    await api.ensureLabel("o/r", "pr-comprehension:flagged", "b60205", "Multiple passive risk signals");
+    await api.ensureLabel("o/r", "VOUCHA:flagged", "b60205", "Multiple passive risk signals");
     expect(f).toHaveBeenCalledTimes(1);
   });
 
@@ -269,7 +269,7 @@ describe("GitHubApi", () => {
       return new Response(JSON.stringify({ message: "already_exists" }), { status: 422 });
     });
     const api = new GitHubApi("tok", f as unknown as typeof fetch);
-    await expect(api.ensureLabel("o/r", "pr-comprehension:flagged", "b60205", "Multiple passive risk signals"))
+    await expect(api.ensureLabel("o/r", "VOUCHA:flagged", "b60205", "Multiple passive risk signals"))
       .resolves.toBeUndefined();
   });
 
