@@ -38,4 +38,4 @@ VOUCHA's first stable public release.
 - Hosted product and documentation at [voucha.dev](https://voucha.dev).
 - Inspectable end-to-end workflow in the
   [public demo repository](https://github.com/idosal/voucha-owner-check-e2e)
-  and [curated demo PR](https://github.com/idosal/voucha-owner-check-e2e/pull/6).
+  and [curated demo PR](https://github.com/idosal/voucha-owner-check-e2e/pull/7).

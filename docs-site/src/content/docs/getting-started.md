@@ -26,7 +26,9 @@ optional Flue investigator are advanced deployment choices, not prerequisites
 for the first repository.
 
 See the entire hosted flow on the
-[public demo pull request](https://github.com/idosal/voucha-owner-check-e2e/pull/6).
+[public demo pull request](https://github.com/idosal/voucha-owner-check-e2e/pull/7).
+
+![A live VOUCHA comment using repository-specific contributor wording](https://raw.githubusercontent.com/idosal/voucha-owner-check-e2e/main/docs/screenshots/voucha-custom-comment.jpg)
 
 ## 2. Add the first policy file
 

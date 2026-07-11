@@ -8,8 +8,10 @@ come from the PR author's own understanding. Passing posts a public
 attestation; maintainers get a behavioral risk report.
 
 **[Install VOUCHA on GitHub](https://github.com/apps/voucha-app/installations/new)**
-· **[See the live demo](https://github.com/idosal/voucha-owner-check-e2e/pull/6)**
+· **[See the live demo](https://github.com/idosal/voucha-owner-check-e2e/pull/7)**
 · **[Read the docs](https://voucha.dev/docs/)**
+
+![VOUCHA uses repository-specific contributor wording in its managed pull request comment](https://raw.githubusercontent.com/idosal/voucha-owner-check-e2e/main/docs/screenshots/voucha-custom-comment.jpg)
 
 The hosted app is free for public repositories. Install it, select a repository,
 and open a pull request; the built-in defaults work without a policy file.
@@ -25,7 +27,7 @@ Private repositories and teams that want full control can
 3. Keep the defaults, or copy [`templates/voucha.yml`](templates/voucha.yml) to
    `.github/voucha.yml` on the merge target branch and adapt it to your review
    risks.
-4. Walk through [the public demo PR](https://github.com/idosal/voucha-owner-check-e2e/pull/6)
+4. Walk through [the public demo PR](https://github.com/idosal/voucha-owner-check-e2e/pull/7)
    to see the GitHub check, author verification, diff-specific challenge, and
    resulting attestation in context.
 
