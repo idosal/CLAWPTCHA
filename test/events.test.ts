@@ -84,19 +84,26 @@ function payloadFor(prNumber: number, sha = "abc123") {
 beforeEach(() => { uniq += 100; });
 
 describe("handlePullRequestEvent", () => {
-  it("creates a pending check, comment, and awaiting_approval challenge for first-timers", async () => {
-    const api = stubApi();
-    const n = uniq + 1;
-    await handlePullRequestEvent(testEnv, api, payloadFor(n));
-    expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
-      name: "PR comprehension check", head_sha: "abc123", status: "queued",
-      details_url: expect.stringContaining("/challenge/"),
-    }));
-    expect(api.upsertPrComment).toHaveBeenCalled();
-    const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
-    expect(ch?.status).toBe("awaiting_approval");
-    expect(ch?.check_run_id).toBe(42);
-  });
+  it.each(["FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "NONE"])(
+    "requires maintainer approval for GitHub outsider association %s",
+    async (authorAssociation) => {
+      const api = stubApi({
+        getPr: vi.fn(async () => ({ ...pr, author_association: authorAssociation })),
+      });
+      const n = uniq + 1;
+      const payload = payloadFor(n);
+      payload.pull_request.author_association = authorAssociation;
+      await handlePullRequestEvent(testEnv, api, payload);
+      expect(api.createCheckRun).toHaveBeenCalledWith("o/r", expect.objectContaining({
+        name: "PR comprehension check", head_sha: "abc123", status: "queued",
+        details_url: expect.stringContaining("/challenge/"),
+      }));
+      expect(api.upsertPrComment).toHaveBeenCalled();
+      const ch = await getChallengeByPr(testEnv.DB, "o/r", n, "abc123");
+      expect(ch?.status).toBe("awaiting_approval");
+      expect(ch?.check_run_id).toBe(42);
+    }
+  );
 
   it("skips approval gate for known contributors under first_time policy", async () => {
     const api = stubApi({
